@@ -1,9 +1,10 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMarketplace } from '../context/MarketplaceContext.jsx'
+import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
 
 const Upload = () => {
-  const { addListing, categories, language, translations } = useMarketplace()
+  const { addListing, categories, language, translations, addLocation, locations, normalize } = useMarketplace()
   const t = translations[language]
   const navigate = useNavigate()
   const [imageFile, setImageFile] = useState(null)
@@ -11,10 +12,14 @@ const Upload = () => {
   const [title, setTitle] = useState('')
   const [price, setPrice] = useState('')
   const [description, setDescription] = useState('')
-  const [contact, setContact] = useState('60123456789')
+  const [whatsapp, setWhatsapp] = useState('')
+  const [wechat, setWechat] = useState('')
+  const [instagram, setInstagram] = useState('')
   const [imageDataUrl, setImageDataUrl] = useState('')
   const [category, setCategory] = useState('')
   const [tagsInput, setTagsInput] = useState('')
+  const [locationName, setLocationName] = useState('')
+  const [latlng, setLatlng] = useState({ lat: 3.119, lng: 101.654 }) // UM 区域默认
 
   const onImageChange = (e) => {
     const f = e.target.files?.[0]
@@ -32,14 +37,59 @@ const Upload = () => {
 
   const submit = (e) => {
     e.preventDefault()
-    if (!imageFile || !title || !price) return
+    if (!imageFile) { alert(language === 'zh' ? '请上传图片' : 'Please upload an image'); return }
+    if (!title.trim()) { alert(language === 'zh' ? '标题不能为空' : 'Title is required'); return }
+    if (!String(price).trim()) { alert(language === 'zh' ? '价格不能为空' : 'Price is required'); return }
     if (!category) {
       alert(language === 'zh' ? '请选择分类' : 'Please select a category')
       return
     }
+    if (!locationName.trim()) {
+      alert(language === 'zh' ? '请输入地点名称' : 'Please enter location name')
+      return
+    }
+    if (!whatsapp && !wechat && !instagram) {
+      alert(language === 'zh' ? '必须填写至少一种联系方式！' : 'At least one contact method is required!')
+      return
+    }
+
+    // 智能修正地点名称
+    let finalLocationName = locationName.trim()
+    const normalizedInput = normalize(finalLocationName)
+    const existingMatch = locations.find(loc => normalize(loc) === normalizedInput)
+    if (existingMatch) {
+      finalLocationName = existingMatch
+    }
+
     const tags = tagsInput.split(' ').map(s => s.trim()).filter(Boolean)
-    const id = addListing({ title, price, imageFile, imageDataUrl, description, contact, category, tags })
+    const id = addListing({
+      title,
+      price,
+      imageFile,
+      imageDataUrl,
+      description,
+      whatsapp,
+      wechat,
+      instagram,
+      locationName: finalLocationName,
+      lat: latlng?.lat,
+      lng: latlng?.lng,
+      category,
+      tags
+    })
+    addLocation(finalLocationName)
     navigate(`/product/${id}`)
+  }
+
+  const ClickPicker = () => {
+    useMapEvents({
+      click(e) {
+        const { lat, lng } = e.latlng
+        setLatlng({ lat, lng })
+        if (!locationName.trim()) setLocationName('Custom Pin')
+      }
+    })
+    return null
   }
 
   return (
@@ -99,12 +149,45 @@ const Upload = () => {
           </select>
         </div>
         <div>
+          <label className="block text-sm text-gray-700">{language === 'zh' ? '地点名称' : 'Location Name'}</label>
+          <input 
+            value={locationName} 
+            onChange={e => setLocationName(e.target.value)} 
+            placeholder={language === 'zh' ? '如：South Link, UM Library' : 'e.g., South Link, UM Library'} 
+            list="location-suggestions"
+            className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" 
+          />
+          <datalist id="location-suggestions">
+            {locations.map((loc, index) => (
+              <option key={index} value={loc} />
+            ))}
+          </datalist>
+          <div className="mt-3 rounded-xl overflow-hidden">
+            <MapContainer center={[latlng.lat, latlng.lng]} zoom={15} style={{ height: 240 }}>
+              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              <Marker position={[latlng.lat, latlng.lng]} />
+              <ClickPicker />
+            </MapContainer>
+            <div className="mt-2 text-xs text-gray-600">{language === 'zh' ? `坐标：${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)}（点击地图可选点）` : `Coords: ${latlng.lat.toFixed(5)}, ${latlng.lng.toFixed(5)} (click map to pick)`}</div>
+          </div>
+        </div>
+        <div>
           <label className="block text-sm text-gray-700">{t.description}</label>
           <textarea value={description} onChange={e => setDescription(e.target.value)} rows={4} placeholder={language === 'zh' ? '简单描述一下商品情况' : 'Briefly describe the item'} className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
         </div>
-        <div>
-          <label className="block text-sm text-gray-700">{language === 'zh' ? 'WhatsApp 号码' : 'WhatsApp Number'}</label>
-          <input value={contact} onChange={e => setContact(e.target.value)} placeholder="60123456789" className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+        <div className="grid grid-cols-1 gap-3">
+          <div>
+            <label className="block text-sm text-gray-700">{language === 'zh' ? 'WhatsApp 号码' : 'WhatsApp Number'}</label>
+            <input value={whatsapp} onChange={e => setWhatsapp(e.target.value)} placeholder="60123456789" className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-700">{language === 'zh' ? '微信号' : 'WeChat ID'}</label>
+            <input value={wechat} onChange={e => setWechat(e.target.value)} placeholder={language === 'zh' ? '如：miho_2025' : 'e.g., miho_2025'} className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
+          <div>
+            <label className="block text-sm text-gray-700">Instagram</label>
+            <input value={instagram} onChange={e => setInstagram(e.target.value)} placeholder={language === 'zh' ? '如：ryan_miho' : 'e.g., ryan_miho'} className="mt-1 w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500" />
+          </div>
         </div>
         <button type="submit" className="w-full bg-indigo-600 text-white rounded-full py-3 text-base font-medium shadow-sm">{t.sell}</button>
       </form>

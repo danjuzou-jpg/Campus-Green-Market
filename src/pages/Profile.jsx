@@ -1,9 +1,10 @@
-import React, { useMemo, useState } from 'react'
+import React, { useMemo, useRef, useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useMarketplace } from '../context/MarketplaceContext.jsx'
-import { CheckCircle } from 'lucide-react'
+import { CheckCircle, Trash2 } from 'lucide-react'
 
 const Profile = () => {
-  const { listings, favorites, user, language, translations, verifyStudent, logoutUser } = useMarketplace()
+  const { listings, favorites, user, language, translations, verifyStudent, logoutUser, setUserAvatar, updateUser, deleteProduct } = useMarketplace()
   const t = translations[language]
   const [tab, setTab] = useState('my')
   const [showModal, setShowModal] = useState(false)
@@ -14,136 +15,233 @@ const Profile = () => {
   const [codeInput, setCodeInput] = useState('')
   const [uploadProgress, setUploadProgress] = useState(0)
   const [isUploading, setIsUploading] = useState(false)
+  const fileRef = useRef(null)
+  
+  // Profile Edit State
+  const [editing, setEditing] = useState(false)
+  const [nameInput, setNameInput] = useState(user.name || '')
+  const [schoolInput, setSchoolInput] = useState(user.school || '')
 
   const myListings = useMemo(() => listings.filter(l => l.owner === 'me'), [listings])
   const favoriteItems = useMemo(() => listings.filter(l => favorites.includes(l.id)), [listings, favorites])
 
-  const Card = ({ item }) => (
-    <div className="rounded-xl shadow-sm overflow-hidden">
-      <div className="w-full aspect-[4/3]">
-        <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
-      </div>
-      <div className="p-2">
-        <div className="text-sm text-gray-900">{item.title}</div>
-        <div className="flex items-center justify-between mt-1">
-          <div className="text-indigo-600 font-bold">RM {item.price}</div>
-          <div className="text-xs text-gray-500">{item.category || 'Others'}</div>
+  const Card = ({ item, isOwner }) => (
+    <div className="rounded-xl shadow-sm overflow-hidden border border-gray-100 bg-white relative group">
+      <Link to={`/product/${item.id}`} className="block">
+        <div className="w-full aspect-[4/3]">
+          <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
         </div>
-      </div>
+        <div className="p-2">
+          <div className="text-sm text-gray-900 truncate font-medium">{item.title}</div>
+          <div className="flex items-center justify-between mt-1">
+            <div className="text-indigo-600 font-bold text-sm">RM {item.price}</div>
+            <div className="text-[10px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded">{item.category || 'Others'}</div>
+          </div>
+        </div>
+      </Link>
+      {isOwner && (
+        <button 
+          onClick={(e) => {
+            e.preventDefault();
+            e.stopPropagation();
+            handleDelete(item.id);
+          }}
+          className="absolute top-2 right-2 bg-white/90 backdrop-blur-sm text-red-500 hover:text-red-700 p-1.5 rounded-lg border border-red-100 shadow-sm transition-colors"
+        >
+          <Trash2 size={14} />
+        </button>
+      )}
     </div>
   )
 
+  const handleDelete = (id) => {
+    if (window.confirm(language === 'zh' ? '确定下架该商品吗？' : 'Confirm to delete this item?')) {
+      deleteProduct(id);
+    }
+  };
+
   const Empty = ({ text }) => (
-    <div className="flex flex-col items-center justify-center text-center text-gray-500 py-10">
-      <div className="w-24 h-24 rounded-full bg-gray-100 mb-3" />
-      <div className="text-sm">{text}</div>
+    <div className="flex flex-col items-center justify-center text-center text-gray-400 py-10 w-full col-span-2">
+      <div className="w-16 h-16 rounded-full bg-gray-50 flex items-center justify-center mb-3">
+        <div className="w-8 h-8 rounded bg-gray-100" />
+      </div>
+      <div className="text-xs">{text}</div>
     </div>
   )
+
+  const handleSaveProfile = () => {
+    const name = nameInput.trim()
+    const school = schoolInput.trim()
+    if (!name || !school) return
+    updateUser({ name, school })
+    setEditing(false)
+  }
 
   return (
     <div className="mx-auto max-w-md px-4 pt-4">
-      <div className="flex items-center gap-3">
-        <img src="https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&q=80" alt="avatar" className="w-16 h-16 rounded-full object-cover" />
-        <div>
-          <div className="flex items-center gap-2">
-            <div className="text-base font-bold">{user.name}</div>
-            {user.verified && <CheckCircle size={16} className="text-green-600" />}
+      <div className="flex items-center gap-4 bg-white p-4 rounded-2xl border border-gray-100 shadow-sm">
+        <div className="relative">
+          <img 
+            onClick={() => fileRef.current?.click()} 
+            src={user.avatar || 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&q=80'} 
+            alt="avatar" 
+            className="w-20 h-20 rounded-full object-cover cursor-pointer border-2 border-indigo-50" 
+          />
+          <div className="absolute bottom-0 right-0 bg-indigo-600 text-white p-1 rounded-full shadow-md">
+            <div className="w-3 h-3 flex items-center justify-center text-[8px]">+</div>
           </div>
-          <div className="text-xs text-gray-500">School: Universiti Malaya</div>
-          <div className={`mt-1 inline-block px-2 py-1 rounded-full text-xs ${user.verified ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
-            {user.verified ? (language === 'zh' ? '已认证 ✅' : 'Verified ✅') : (language === 'zh' ? '未认证' : 'Unverified')}
-          </div>
+        </div>
+        <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => {
+          const f = e.target.files?.[0]
+          if (!f) return
+          const reader = new FileReader()
+          reader.onload = () => {
+            const base64 = reader.result
+            if (typeof base64 === 'string') setUserAvatar(base64)
+          }
+          reader.readAsDataURL(f)
+        }} />
+        
+        <div className="flex-1 min-w-0">
+          {editing ? (
+            <div className="space-y-2">
+              <input 
+                value={nameInput} 
+                onChange={e => setNameInput(e.target.value)} 
+                placeholder={language === 'zh' ? '用户名' : 'Username'}
+                className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-sm focus:ring-1 focus:ring-indigo-500 outline-none" 
+              />
+              <input 
+                value={schoolInput} 
+                onChange={e => setSchoolInput(e.target.value)} 
+                placeholder={language === 'zh' ? '学校名称' : 'School Name'}
+                className="w-full px-2 py-1.5 rounded-lg border border-gray-200 text-sm focus:ring-1 focus:ring-indigo-500 outline-none" 
+              />
+              <button
+                onClick={handleSaveProfile}
+                className="w-full py-1.5 rounded-lg bg-indigo-600 text-white text-xs font-bold shadow-sm"
+              >
+                {language === 'zh' ? '保存修改' : 'Save Changes'}
+              </button>
+            </div>
+          ) : (
+            <>
+              <div className="flex items-center gap-2">
+                <div className="text-lg font-bold text-gray-900 truncate">{user.name}</div>
+                {user.verified && <CheckCircle size={18} className="text-green-600 shrink-0" />}
+              </div>
+              <div className="text-xs text-gray-500 mt-0.5 truncate flex items-center gap-1">
+                <span className="shrink-0">{language === 'zh' ? '学校:' : 'School:'}</span>
+                <span className="truncate">{user.school || 'Universiti Malaya'}</span>
+              </div>
+              <div className={`mt-2 inline-flex items-center px-2.5 py-1 rounded-full text-[10px] font-medium ${user.verified ? 'bg-green-100 text-green-700' : 'bg-gray-100 text-gray-600'}`}>
+                {user.verified ? (language === 'zh' ? '已通过学生认证 ✅' : 'Verified Student ✅') : (language === 'zh' ? '未认证' : 'Unverified')}
+              </div>
+            </>
+          )}
         </div>
       </div>
 
-      <div className="mt-4 grid grid-cols-3 gap-2">
-        <div className="rounded-xl bg-gray-100 p-3 text-center">
-          <div className="text-lg font-bold">12</div>
-          <div className="text-xs text-gray-600">{language === 'zh' ? '已售' : 'Sold'}</div>
-        </div>
-        <div className="rounded-xl bg-gray-100 p-3 text-center">
-          <div className="text-lg font-bold">4.8</div>
-          <div className="text-xs text-gray-600">{language === 'zh' ? '评分' : 'Rating'}</div>
-        </div>
-        <div className="rounded-xl bg-gray-100 p-3 text-center">
-          <div className="text-lg font-bold">{myListings.length}</div>
-          <div className="text-xs text-gray-600">{language === 'zh' ? '在售' : 'Listings'}</div>
-        </div>
-      </div>
-
-      <div className="mt-4">
+      <div className="mt-4 flex gap-2">
         <button
-          onClick={() => setShowModal(true)}
-          className="w-full bg-green-500 text-white rounded-xl py-3 text-sm font-medium shadow-sm"
+          onClick={() => {
+            if (editing) {
+              setNameInput(user.name)
+              setSchoolInput(user.school)
+            }
+            setEditing(e => !e)
+          }}
+          className={`flex-1 rounded-xl py-3 text-sm font-medium shadow-sm transition-colors ${editing ? 'bg-gray-100 text-gray-600' : 'bg-white border border-gray-200 text-gray-900'}`}
         >
-          {t.verifyStudent}
+          {language === 'zh' ? (editing ? '取消' : '编辑资料') : (editing ? 'Cancel' : 'Edit Profile')}
         </button>
-      </div>
-
-      <div className="mt-5 flex gap-2">
-        <button onClick={() => setTab('my')} className={`px-3 py-1 rounded-full text-xs ${tab === 'my' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700'}`}>{language === 'zh' ? '我发布的' : 'My Listings'}</button>
-        <button onClick={() => setTab('fav')} className={`px-3 py-1 rounded-full text-xs ${tab === 'fav' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700'}`}>{language === 'zh' ? '收藏' : 'Favorites'}</button>
-      </div>
-
-      <div className="mt-4 columns-2 gap-3">
-        {tab === 'my' && (myListings.length ? myListings.map(item => (
-          <div key={item.id} className="mb-3 break-inside-avoid">
-            <Card item={item} />
-          </div>
-        )) : <Empty text={language === 'zh' ? '暂无发布的商品' : 'No listings yet'} />)}
-        {tab === 'fav' && (favoriteItems.length ? favoriteItems.map(item => (
-          <div key={item.id} className="mb-3 break-inside-avoid">
-            <Card item={item} />
-          </div>
-        )) : <Empty text={language === 'zh' ? '暂无收藏的商品' : 'No favorites yet'} />)}
+        {!user.verified && (
+          <button
+            onClick={() => setShowModal(true)}
+            className="flex-1 bg-green-500 text-white rounded-xl py-3 text-sm font-medium shadow-sm active:bg-green-600"
+          >
+            {t.verifyStudent}
+          </button>
+        )}
       </div>
 
       <div className="mt-6">
+        <div className="flex border-b border-gray-100">
+          <button 
+            onClick={() => setTab('my')} 
+            className={`flex-1 py-3 text-sm font-medium transition-colors relative ${tab === 'my' ? 'text-indigo-600' : 'text-gray-400'}`}
+          >
+            {language === 'zh' ? '我发布的' : 'My Listings'}
+            {tab === 'my' && <div className="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-indigo-600 rounded-t" />}
+          </button>
+          <button 
+            onClick={() => setTab('fav')} 
+            className={`flex-1 py-3 text-sm font-medium transition-colors relative ${tab === 'fav' ? 'text-indigo-600' : 'text-gray-400'}`}
+          >
+            {language === 'zh' ? '收藏夹' : 'Favorites'}
+            {tab === 'fav' && <div className="absolute bottom-0 left-1/4 right-1/4 h-0.5 bg-indigo-600 rounded-t" />}
+          </button>
+        </div>
+
+        <div className="mt-4 grid grid-cols-2 gap-3 pb-20">
+          {tab === 'my' && (myListings.length ? myListings.map(item => (
+            <Card key={item.id} item={item} isOwner={true} />
+          )) : <Empty text={language === 'zh' ? '暂无发布的商品' : 'No listings yet'} />)}
+          {tab === 'fav' && (favoriteItems.length ? favoriteItems.map(item => (
+            <Card key={item.id} item={item} isOwner={false} />
+          )) : <Empty text={language === 'zh' ? '暂无收藏的商品' : 'No favorites yet'} />)}
+        </div>
+      </div>
+
+      <div className="fixed bottom-20 left-4 right-4 max-w-md mx-auto">
         <button
           onClick={() => {
-            localStorage.clear()
-            window.location.reload()
+            if (confirm(language === 'zh' ? '确定要退出登录吗？' : 'Are you sure to log out?')) {
+              localStorage.clear()
+              window.location.reload()
+            }
           }}
-          className="w-full bg-red-500 text-white rounded-xl py-3 text-sm font-medium shadow-sm"
+          className="w-full bg-white text-red-500 border border-red-100 rounded-xl py-3 text-sm font-medium shadow-sm active:bg-red-50"
         >
-          {language === 'zh' ? '退出登录' : 'Log Out'}
+          {t.logout}
         </button>
       </div>
+
       {showModal && (
-        <div className="fixed inset-0 z-50">
-          <div className="absolute inset-0 bg-black/50" onClick={() => setShowModal(false)} />
-          <div className="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 w-[92%] max-w-sm bg-white rounded-2xl shadow-lg">
-            <div className="p-4 border-b border-gray-200">
-              <div className="text-base font-bold">{language === 'zh' ? '学生认证' : 'Student Verification'}</div>
-              <div className="mt-2 flex gap-2">
+        <div className="fixed inset-0 z-[60] flex items-center justify-center px-4">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setShowModal(false)} />
+          <div className="relative w-full max-w-sm bg-white rounded-3xl shadow-2xl overflow-hidden">
+            <div className="p-6 border-b border-gray-100">
+              <div className="text-xl font-bold text-gray-900">{language === 'zh' ? '学生认证' : 'Student Verification'}</div>
+              <div className="mt-4 flex bg-gray-50 p-1 rounded-xl">
                 <button
                   onClick={() => setVerifyMethod('email')}
-                  className={`px-3 py-1 rounded-full text-xs ${verifyMethod === 'email' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700'}`}
+                  className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${verifyMethod === 'email' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500'}`}
                 >
                   {language === 'zh' ? '邮箱认证' : 'Email'}
                 </button>
                 <button
                   onClick={() => setVerifyMethod('file')}
-                  className={`px-3 py-1 rounded-full text-xs ${verifyMethod === 'file' ? 'bg-indigo-600 text-white' : 'bg-gray-100 text-gray-700'}`}
+                  className={`flex-1 py-2 rounded-lg text-xs font-medium transition-all ${verifyMethod === 'file' ? 'bg-white text-indigo-600 shadow-sm' : 'text-gray-500'}`}
                 >
                   {language === 'zh' ? '文件认证' : 'File'}
                 </button>
               </div>
             </div>
-            <div className="p-4">
+            <div className="p-6">
               {verifyMethod === 'email' && (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   <div>
-                    <div className="text-xs text-gray-600 mb-1">{language === 'zh' ? '请输入学生邮箱 (*.edu.my)' : 'Enter student email (*.edu.my)'}</div>
+                    <div className="text-xs text-gray-500 mb-1.5 ml-1">{language === 'zh' ? '学生邮箱 (*.edu.my)' : 'Student Email (*.edu.my)'}</div>
                     <input
                       value={emailInput}
                       onChange={e => setEmailInput(e.target.value)}
                       placeholder="name@school.edu.my"
-                      className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                      className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500 transition-all"
                     />
-                    {emailError && <div className="mt-1 text-xs text-red-600">{emailError}</div>}
+                    {emailError && <div className="mt-1.5 text-[10px] text-red-500 ml-1">{emailError}</div>}
                   </div>
-                  {!codeSent && (
+                  {!codeSent ? (
                     <button
                       onClick={() => {
                         const ok = emailInput.trim().toLowerCase().endsWith('.edu.my')
@@ -155,30 +253,31 @@ const Profile = () => {
                         setCodeSent(true)
                         alert('Verification code: 8888')
                       }}
-                      className="w-full bg-indigo-600 text-white rounded-xl py-2 text-sm"
+                      className="w-full bg-indigo-600 text-white rounded-xl py-3 text-sm font-bold shadow-lg shadow-indigo-200"
                     >
                       {language === 'zh' ? '发送验证码' : 'Send Code'}
                     </button>
-                  )}
-                  {codeSent && (
-                    <div className="space-y-2">
+                  ) : (
+                    <div className="space-y-3">
                       <input
                         value={codeInput}
                         onChange={e => setCodeInput(e.target.value)}
                         placeholder={language === 'zh' ? '输入验证码' : 'Enter verification code'}
-                        className="w-full rounded-xl border border-gray-300 px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
+                        className="w-full rounded-xl border border-gray-200 px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-indigo-500/20 focus:border-indigo-500"
                       />
-                      <button
-                        type="button"
-                        onClick={() => {
-                          setCodeSent(false)
-                          setCodeInput('')
-                          setEmailError('')
-                        }}
-                        className="text-xs text-gray-500 underline"
-                      >
-                        {language === 'zh' ? '修改邮箱' : 'Change Email'}
-                      </button>
+                      <div className="flex items-center justify-between px-1">
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setCodeSent(false)
+                            setCodeInput('')
+                            setEmailError('')
+                          }}
+                          className="text-[10px] text-gray-400 underline"
+                        >
+                          {language === 'zh' ? '修改邮箱' : 'Change Email'}
+                        </button>
+                      </div>
                       <button
                         onClick={() => {
                           if (codeInput.trim() === '8888') {
@@ -191,7 +290,7 @@ const Profile = () => {
                             alert(language === 'zh' ? '验证码错误' : 'Incorrect code')
                           }
                         }}
-                        className="w-full bg-green-600 text-white rounded-xl py-2 text-sm"
+                        className="w-full bg-green-600 text-white rounded-xl py-3 text-sm font-bold shadow-lg shadow-green-200"
                       >
                         {language === 'zh' ? '完成认证' : 'Verify'}
                       </button>
@@ -200,11 +299,12 @@ const Profile = () => {
                 </div>
               )}
               {verifyMethod === 'file' && (
-                <div className="space-y-3">
-                  <div className="text-xs text-gray-600">{language === 'zh' ? '上传 Offer Letter / 学生证' : 'Upload Offer Letter / Student ID'}</div>
+                <div className="space-y-4">
+                  <div className="text-xs text-gray-500 ml-1">{language === 'zh' ? '上传 Offer Letter / 学生证' : 'Upload Offer Letter / Student ID'}</div>
                   <label className="block">
-                    <div className="w-full h-24 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-500 text-xs">
-                      {language === 'zh' ? '点击选择文件' : 'Click to choose file'}
+                    <div className="w-full h-32 rounded-2xl border-2 border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400 bg-gray-50 hover:bg-gray-100 transition-colors cursor-pointer">
+                      <div className="text-2xl mb-2">📄</div>
+                      <div className="text-[10px] font-medium">{language === 'zh' ? '点击或拖拽上传' : 'Click or drag to upload'}</div>
                     </div>
                     <input
                       type="file"
@@ -215,40 +315,37 @@ const Profile = () => {
                         const start = Date.now()
                         const progressTimer = setInterval(() => {
                           const elapsed = Date.now() - start
-                          const pct = Math.min(100, Math.round((elapsed / 2000) * 100))
+                          const pct = Math.min(100, Math.round((elapsed / 1500) * 100))
                           setUploadProgress(pct)
                           if (pct >= 100) {
                             clearInterval(progressTimer)
+                            setTimeout(() => {
+                              verifyStudent()
+                              setShowModal(false)
+                              setIsUploading(false)
+                              setUploadProgress(0)
+                            }, 500)
                           }
-                        }, 100)
-                        setTimeout(() => {
-                          setIsUploading(false)
-                          verifyStudent()
-                          alert(language === 'zh' ? '验证成功' : 'Verification Successful')
-                          setShowModal(false)
-                        }, 2000)
+                        }, 50)
                       }}
                     />
                   </label>
-                  <div className="w-full h-2 bg-gray-200 rounded-full overflow-hidden">
-                    <div className="h-2 bg-indigo-600" style={{ width: `${uploadProgress}%` }} />
-                  </div>
                   {isUploading && (
-                    <button
-                      disabled
-                      className="w-full bg-indigo-600/60 text-white rounded-xl py-2 text-sm cursor-not-allowed flex items-center justify-center gap-2"
-                    >
-                      <span className="inline-block w-4 h-4 border-2 border-white border-t-transparent rounded-full animate-spin" />
-                      {language === 'zh' ? '正在上传与审核…' : 'Uploading & Verifying...'}
-                    </button>
+                    <div className="space-y-2">
+                      <div className="flex justify-between text-[10px] text-gray-500 px-1">
+                        <span>{language === 'zh' ? '上传中...' : 'Uploading...'}</span>
+                        <span>{uploadProgress}%</span>
+                      </div>
+                      <div className="w-full h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                        <div 
+                          className="h-full bg-indigo-600 transition-all duration-300" 
+                          style={{ width: `${uploadProgress}%` }} 
+                        />
+                      </div>
+                    </div>
                   )}
                 </div>
               )}
-            </div>
-            <div className="p-4 border-t border-gray-200 flex justify-end gap-2">
-              <button onClick={() => setShowModal(false)} className="px-3 py-2 rounded-lg bg-gray-100 text-gray-800 text-sm">
-                {language === 'zh' ? '取消' : 'Cancel'}
-              </button>
             </div>
           </div>
         </div>

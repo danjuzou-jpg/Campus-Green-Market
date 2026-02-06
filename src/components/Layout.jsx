@@ -2,6 +2,7 @@ import React from 'react'
 import { Outlet, Link } from 'react-router-dom'
 import BottomNav from './BottomNav.jsx'
 import Logo from './Logo'
+import { Languages } from 'lucide-react'
 import { useMarketplace } from '../context/MarketplaceContext.jsx'
 
 const Layout = () => {
@@ -14,7 +15,9 @@ const Layout = () => {
           <Link to="/" aria-label="Go Home" className="flex items-center">
             <Logo />
           </Link>
-          <button onClick={toggleLanguage} className="text-sm px-2 py-1 rounded-md border border-gray-200">{label}</button>
+          <button onClick={toggleLanguage} className="w-10 h-10 rounded-full bg-gray-100 hover:bg-gray-200 flex items-center justify-center">
+            <Languages size={18} />
+          </button>
         </div>
       </header>
       <div className="pt-16 pb-24">

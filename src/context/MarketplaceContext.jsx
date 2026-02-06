@@ -87,7 +87,10 @@ export const MarketplaceProvider = ({ children }) => {
   const [listings, setListings] = useState([])
   const [favorites, setFavorites] = useState([])
   const [language, setLanguage] = useState('zh')
-  const [user, setUser] = useState({ name: 'Guest User', school: 'Universiti Malaya (UM)', verified: false })
+  const [user, setUser] = useState({ name: 'Guest User', school: 'Universiti Malaya (UM)', verified: false, avatar: 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&q=80' })
+  const [locations, setLocations] = useState(['All Locations', 'Ryan & Miho', 'Pacific Tower', 'South Link', 'UM Library', 'Jaya One'])
+
+  const normalize = (str) => str.toLowerCase().replace(/[^a-z0-9]/g, '');
 
   const translations = useMemo(() => ({
     en: {
@@ -128,32 +131,52 @@ export const MarketplaceProvider = ({ children }) => {
           setListings(Array.isArray(parsed?.listings) ? parsed.listings : defaultProducts)
           setFavorites(Array.isArray(parsed?.favorites) ? parsed.favorites : [])
           setLanguage(parsed?.language === 'en' ? 'en' : 'zh')
-          setUser(parsed?.user && typeof parsed.user === 'object' ? parsed.user : { name: 'Guest User', school: 'Universiti Malaya (UM)', verified: false })
+          setUser(parsed?.user && typeof parsed.user === 'object' ? parsed.user : { name: 'Guest User', school: 'Universiti Malaya (UM)', verified: false, avatar: 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&q=80' })
+          setLocations(Array.isArray(parsed?.locations) ? parsed.locations : ['All Locations', 'Ryan & Miho', 'Pacific Tower', 'South Link', 'UM Library', 'Jaya One'])
         }
       } catch {
         setListings(defaultProducts)
         setFavorites([])
         setLanguage('zh')
-        setUser({ name: 'Guest User', school: 'Universiti Malaya (UM)', verified: false })
+        setUser({ name: 'Guest User', school: 'Universiti Malaya (UM)', verified: false, avatar: 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&q=80' })
+        setLocations(['All Locations', 'Ryan & Miho', 'Pacific Tower', 'South Link', 'UM Library', 'Jaya One'])
       }
     } else {
       setListings(defaultProducts)
       setFavorites([])
       setLanguage('zh')
-      setUser({ name: 'Guest User', school: 'Universiti Malaya (UM)', verified: false })
+      setUser({ name: 'Guest User', school: 'Universiti Malaya (UM)', verified: false, avatar: 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&q=80' })
+      setLocations(['All Locations', 'Ryan & Miho', 'Pacific Tower', 'South Link', 'UM Library', 'Jaya One'])
     }
   }, [])
 
   useEffect(() => {
-    const payload = { listings, favorites, language, user }
+    const payload = { listings, favorites, language, user, locations }
     localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
-  }, [listings, favorites, language, user])
+  }, [listings, favorites, language, user, locations])
 
-  const addListing = ({ title, price, imageFile, imageDataUrl, description, contact, category, tags = [] }) => {
+  const addListing = ({ title, price, imageFile, imageDataUrl, description, whatsapp, wechat, instagram, locationName, lat, lng, category, tags = [] }) => {
     const id = `${Date.now()}`
     const imageUrl = imageDataUrl || (imageFile ? URL.createObjectURL(imageFile) : '')
     const createdAt = Date.now()
-    const next = [{ id, title, price: Number(price), imageUrl, description: description || '', createdAt, contact: contact || '60123456789', category, tags, owner: 'me' }, ...listings]
+    const next = [{
+      id,
+      title,
+      price: Number(price),
+      imageUrl,
+      description: description || '',
+      createdAt,
+      contact: whatsapp || '',
+      whatsapp: whatsapp || '',
+      wechat: wechat || '',
+      instagram: instagram || '',
+      locationName: locationName || '',
+      lat: typeof lat === 'number' ? lat : undefined,
+      lng: typeof lng === 'number' ? lng : undefined,
+      category,
+      tags,
+      owner: 'me'
+    }, ...listings]
     setListings(next)
     return id
   }
@@ -161,6 +184,10 @@ export const MarketplaceProvider = ({ children }) => {
   const deleteListing = (id) => {
     setListings(listings.filter(l => l.id !== id))
     setFavorites(favorites.filter(fid => fid !== id))
+  }
+
+  const deleteProduct = (id) => {
+    setListings(prev => prev.filter(item => item.id !== id))
   }
 
   const toggleFavorite = (id) => {
@@ -176,7 +203,25 @@ export const MarketplaceProvider = ({ children }) => {
   }
 
   const logoutUser = () => {
-    setUser({ name: 'Guest User', school: 'Universiti Malaya (UM)', verified: false })
+    setUser({ name: 'Guest User', school: 'Universiti Malaya (UM)', verified: false, avatar: 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&q=80' })
+  }
+
+  const setUserAvatar = (avatar) => {
+    setUser(prev => ({ ...prev, avatar }))
+  }
+  const setUserSchool = (school) => {
+    setUser(prev => ({ ...prev, school }))
+  }
+  const updateUser = ({ name, school }) => {
+    setUser(prev => ({ ...prev, name, school }))
+  }
+  const addLocation = (newLoc) => {
+    const name = (newLoc || '').trim()
+    if (!name) return
+    const exists = locations.some(loc => normalize(loc) === normalize(name))
+    if (!exists) {
+      setLocations(prev => [...prev, name])
+    }
   }
 
   const value = useMemo(() => ({
@@ -191,8 +236,15 @@ export const MarketplaceProvider = ({ children }) => {
     user,
     toggleLanguage,
     verifyStudent,
-    logoutUser
-  }), [listings, favorites, language, user])
+    logoutUser,
+    setUserAvatar,
+    setUserSchool,
+    updateUser,
+    locations,
+    addLocation,
+    normalize,
+    deleteProduct
+  }), [listings, favorites, language, user, locations, normalize])
   return <MarketplaceContext.Provider value={value}>{children}</MarketplaceContext.Provider>
 }
 
