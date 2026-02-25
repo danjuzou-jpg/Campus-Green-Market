@@ -119,30 +119,30 @@ const Profile = () => {
   }
 
   const Card = ({ item, isOwner }) => (
-    <div className="rounded-xl shadow-sm overflow-hidden border border-gray-100 bg-white relative group">
-      <Link to={`/product/${item.id}`} className="block">
-        <div className="w-full aspect-[4/3]">
-          <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover" />
+    <div className="bg-white/80 backdrop-blur-sm rounded-[2rem] p-3 shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-white/60 relative group flex flex-col h-full hover:shadow-[0_12px_30px_rgba(0,0,0,0.06)] transition-all duration-300">
+      <Link to={`/product/${item.id}`} className="block flex-1 flex flex-col">
+        <div className="w-full aspect-square rounded-2xl overflow-hidden bg-slate-50 relative mb-3">
+          <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
         </div>
-        <div className="p-2">
-          <div className="text-sm text-gray-900 truncate font-medium">{item.title}</div>
-          <div className="flex items-center justify-between mt-1">
-            <div className="text-emerald-600 font-bold text-sm">{item.currency === 'CNY' ? '¥' : 'RM'} {item.price}</div>
-            <div className="text-[10px] text-gray-400 bg-gray-50 px-1.5 py-0.5 rounded">{item.category || 'Others'}</div>
+        <div className="flex flex-col flex-1 px-1">
+          <div className="text-[13px] text-slate-800 font-bold leading-snug line-clamp-2 mb-1.5">{item.title}</div>
+          <div className="flex items-center justify-between mt-auto pt-2">
+            <div className="text-teal-600 font-black text-[15px]">{item.currency === 'CNY' ? '¥' : 'RM'} {item.price}</div>
+            <div className="text-[10px] font-bold text-slate-400 bg-slate-100 px-2 py-1 rounded-full uppercase tracking-wider">{item.category || 'Others'}</div>
           </div>
         </div>
       </Link>
       {isOwner && (
-        <div className="absolute top-2 right-2 flex gap-1">
+        <div className="absolute top-4 right-4 flex gap-1.5 z-10">
           <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); navigate(`/edit/${item.id}`) }}
-            className="bg-white/90 backdrop-blur-sm text-emerald-500 hover:text-emerald-700 p-1.5 rounded-lg border border-emerald-100 shadow-sm transition-colors"
+            className="w-8 h-8 flex items-center justify-center bg-white/90 backdrop-blur-md text-teal-600 hover:text-teal-700 hover:bg-teal-50 rounded-full shadow-sm border border-white transition-colors"
           >
             <Edit3 size={14} />
           </button>
           <button
             onClick={(e) => { e.preventDefault(); e.stopPropagation(); handleDelete(item.id) }}
-            className="bg-white/90 backdrop-blur-sm text-red-500 hover:text-red-700 p-1.5 rounded-lg border border-red-100 shadow-sm transition-colors"
+            className="w-8 h-8 flex items-center justify-center bg-white/90 backdrop-blur-md text-rose-500 hover:text-rose-700 hover:bg-rose-50 rounded-full shadow-sm border border-white transition-colors"
           >
             <Trash2 size={14} />
           </button>
@@ -163,139 +163,145 @@ const Profile = () => {
   const fileRef = useRef(null)
 
   return (
-    <div className="mx-auto max-w-md min-h-screen flex flex-col bg-gray-50 pb-24 relative">
+    <div className="mx-auto max-w-2xl min-h-screen flex flex-col pb-24 relative">
       {/* Area A: Top Card */}
-      <div className="bg-gradient-to-r from-emerald-500 to-teal-400 px-4 pt-6 pb-6 rounded-b-[32px] shadow-sm">
-        <div className="flex items-center gap-4">
-          <div className="relative">
-            <img
-              onClick={() => fileRef.current?.click()}
-              src={user.avatar || 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&q=80'}
-              alt="avatar"
-              className="w-20 h-20 rounded-full object-cover cursor-pointer border-4 border-white shadow-md"
-            />
-            <div className="absolute bottom-0 right-0 bg-emerald-600 text-white p-1.5 rounded-full shadow-md border-2 border-white">
-              <Camera size={10} />
-            </div>
-          </div>
-          <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => {
-            const f = e.target.files?.[0]
-            if (!f) return
-            uploadAvatar(f)
-          }} />
+      <div className="px-4 pt-6">
+        <div className="bg-[#00b478] px-6 pt-8 pb-8 rounded-[2.5rem] shadow-[0_12px_30px_rgba(0,180,120,0.25)] relative overflow-hidden">
+          {/* Decorative shapes */}
+          <div className="absolute -top-12 -right-12 w-32 h-32 bg-white/10 rounded-full blur-2xl pointer-events-none" />
+          <div className="absolute -bottom-8 -left-8 w-24 h-24 bg-teal-400/20 rounded-full blur-xl pointer-events-none" />
 
-          <div className="flex-1 min-w-0">
-            {editing ? (
-              <div className="space-y-2">
-                <input
-                  value={nameInput}
-                  onChange={e => setNameInput(e.target.value)}
-                  placeholder={t.username}
-                  className="w-full px-3 py-2 rounded-xl border border-white/30 bg-white/20 text-white placeholder-white/70 text-sm focus:ring-2 focus:ring-white outline-none transition-all"
-                />
-                <input
-                  value={schoolInput}
-                  onChange={e => setSchoolInput(e.target.value)}
-                  placeholder={t.schoolName}
-                  className="w-full px-3 py-2 rounded-xl border border-white/30 bg-white/20 text-white placeholder-white/70 text-sm focus:ring-2 focus:ring-white outline-none transition-all"
-                />
-                <button
-                  onClick={handleSaveProfile}
-                  className="w-full py-2 rounded-xl bg-white text-emerald-600 text-xs font-bold shadow-lg"
-                >
-                  {t.saveChanges}
-                </button>
+          <div className="flex items-center gap-5 relative z-10">
+            <div className="relative shrink-0">
+              <img
+                onClick={() => fileRef.current?.click()}
+                src={user.avatar || 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&q=80'}
+                alt="avatar"
+                className="w-20 h-20 rounded-full object-cover cursor-pointer border-[3px] border-white/80 shadow-[0_8px_16px_rgba(0,0,0,0.1)] transition-transform hover:scale-105"
+              />
+              <div className="absolute bottom-0 right-0 bg-white text-teal-600 p-1.5 rounded-full shadow-sm border-[2px] border-[#00b478]">
+                <Camera size={12} strokeWidth={3} />
               </div>
-            ) : (
-              <>
-                <div className="flex items-center gap-2">
-                  <div className="text-lg font-black text-white truncate">{user.name}</div>
-                  {user.verificationStatus === 'verified' && <CheckCircle size={18} className="text-white shrink-0" />}
-                </div>
-                <div className="text-xs text-emerald-50 font-medium truncate mt-0.5">
-                  {user.school || 'Universiti Malaya'}
-                </div>
+            </div>
+            <input ref={fileRef} type="file" accept="image/*" className="hidden" onChange={e => {
+              const f = e.target.files?.[0]
+              if (!f) return
+              uploadAvatar(f)
+            }} />
 
-                {/* Status Badges or Verify Button */}
-                <div className="mt-3">
-                  {user.verificationStatus === 'unverified' && (
-                    <button
-                      onClick={() => setIsModalOpen(true)}
-                      className="bg-white text-emerald-600 text-[10px] font-black px-4 py-1.5 rounded-full shadow-md active:scale-95 transition-all"
-                    >
-                      {t.verifyNow}
-                    </button>
-                  )}
-                  {user.verificationStatus === 'pending' && (
-                    <div className="inline-flex items-center gap-1 px-3 py-1 bg-yellow-400 text-yellow-900 rounded-full text-[10px] font-black shadow-sm">
-                      <span className="animate-pulse">⏳</span>
-                      {t.pendingBadge}
-                    </div>
-                  )}
-                  {user.verificationStatus === 'verified' && (
-                    <div className="inline-flex items-center gap-1 px-3 py-1 bg-emerald-600 text-white border border-emerald-400 rounded-full text-[10px] font-black">
-                      <span>✅</span>
-                      {t.verifiedBadge}
-                    </div>
-                  )}
+            <div className="flex-1 min-w-0">
+              {editing ? (
+                <div className="space-y-3">
+                  <input
+                    value={nameInput}
+                    onChange={e => setNameInput(e.target.value)}
+                    placeholder={t.username}
+                    className="w-full px-4 py-2.5 rounded-2xl border border-white/30 bg-white/20 text-white placeholder-white/70 text-sm focus:ring-2 focus:ring-white outline-none transition-all font-bold"
+                  />
+                  <input
+                    value={schoolInput}
+                    onChange={e => setSchoolInput(e.target.value)}
+                    placeholder={t.schoolName}
+                    className="w-full px-4 py-2.5 rounded-2xl border border-white/30 bg-white/20 text-white placeholder-white/70 text-sm focus:ring-2 focus:ring-white outline-none transition-all font-bold"
+                  />
+                  <button
+                    onClick={handleSaveProfile}
+                    className="w-full py-2.5 rounded-2xl bg-white text-teal-600 font-black shadow-lg shadow-black/10 active:scale-95 transition-all text-[13px] uppercase tracking-wider"
+                  >
+                    {t.saveChanges}
+                  </button>
                 </div>
-              </>
-            )}
+              ) : (
+                <>
+                  <div className="flex items-center gap-2">
+                    <div className="text-xl font-black text-white truncate drop-shadow-sm">{user.name}</div>
+                    {user.verificationStatus === 'verified' && <CheckCircle size={20} fill="#fdfbf7" className="text-[#00b478] shrink-0" />}
+                  </div>
+                  <div className="text-[13px] text-teal-50 font-bold truncate mt-1 opacity-90 drop-shadow-sm">
+                    {user.school || 'Universiti Malaya'}
+                  </div>
+
+                  {/* Status Badges or Verify Button */}
+                  <div className="mt-4">
+                    {user.verificationStatus === 'unverified' && (
+                      <button
+                        onClick={() => setIsModalOpen(true)}
+                        className="bg-white text-teal-600 text-[11px] font-black px-5 py-2 rounded-full shadow-lg shadow-black/10 active:scale-95 transition-all uppercase tracking-wider"
+                      >
+                        {t.verifyNow}
+                      </button>
+                    )}
+                    {user.verificationStatus === 'pending' && (
+                      <div className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-400 text-amber-900 rounded-full text-[11px] font-black shadow-lg shadow-black/5 uppercase tracking-wider">
+                        <span className="animate-pulse">⏳</span>
+                        {t.pendingBadge}
+                      </div>
+                    )}
+                    {user.verificationStatus === 'verified' && (
+                      <div className="inline-flex items-center gap-1.5 px-4 py-2 bg-white/20 min-w-max text-white border border-white/30 rounded-full text-[11px] font-black uppercase tracking-wider backdrop-blur-md">
+                        <span>✅</span>
+                        {t.verifiedBadge}
+                      </div>
+                    )}
+                  </div>
+                </>
+              )}
+            </div>
           </div>
         </div>
       </div>
 
       {/* Area B: Menu List */}
-      <div className="px-4 mt-6 space-y-3">
-        <button
-          onClick={() => navigate('/inbox')}
-          className="w-full flex items-center justify-between p-4 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all active:scale-95"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-emerald-50 flex items-center justify-center text-emerald-600">
-              <MessageSquare size={20} />
+      <div className="px-4 mt-6">
+        <div className="bg-white/80 backdrop-blur-xl rounded-[2rem] p-3 shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-white/60 space-y-2">
+          <button
+            onClick={() => navigate('/inbox')}
+            className="w-full flex items-center justify-between p-4 bg-white/40 hover:bg-white rounded-2xl transition-all active:scale-95"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-[1.2rem] bg-teal-50 flex items-center justify-center text-teal-600 shadow-sm border border-teal-100/50">
+                <MessageSquare size={22} />
+              </div>
+              <span className="text-[15px] font-black text-slate-700">{t.myInbox}</span>
             </div>
-            <span className="text-sm font-bold text-gray-700">{t.myInbox}</span>
-          </div>
-          <ChevronRight size={16} className="text-gray-300" />
-        </button>
+            <ChevronRight size={18} className="text-slate-300" />
+          </button>
 
-        <button
-          onClick={() => {
-            if (editing) {
-              setNameInput(user.name)
-              setSchoolInput(user.school)
-            }
-            setEditing(e => !e)
-          }}
-          className="w-full flex items-center justify-between p-4 bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-all active:scale-95"
-        >
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-full bg-blue-50 flex items-center justify-center text-blue-600">
-              <UserCircle size={20} />
+          <button
+            onClick={() => {
+              if (editing) {
+                setNameInput(user.name)
+                setSchoolInput(user.school)
+              }
+              setEditing(e => !e)
+            }}
+            className="w-full flex items-center justify-between p-4 bg-white/40 hover:bg-white rounded-2xl transition-all active:scale-95"
+          >
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-[1.2rem] bg-amber-50 flex items-center justify-center text-amber-500 shadow-sm border border-amber-100/50">
+                <UserCircle size={22} />
+              </div>
+              <span className="text-[15px] font-black text-slate-700">{t.editProfile}</span>
             </div>
-            <span className="text-sm font-bold text-gray-700">{t.editProfile}</span>
-          </div>
-          <ChevronRight size={16} className="text-gray-300" />
-        </button>
+            <ChevronRight size={18} className="text-slate-300" />
+          </button>
+        </div>
       </div>
 
       {/* Listings Section */}
       <div className="mt-8 px-4 flex-1">
-        <div className="flex gap-4 border-b border-gray-100 px-2">
+        <div className="flex gap-2">
           <button
             onClick={() => setTab('my')}
-            className={`pb-3 text-sm font-black transition-all relative ${tab === 'my' ? 'text-emerald-600' : 'text-gray-400'}`}
+            className={`flex-1 py-3 text-[13px] font-black transition-all rounded-[1.5rem] ${tab === 'my' ? 'bg-teal-50 text-teal-600 shadow-sm border border-teal-100/50' : 'bg-white/50 text-slate-400 hover:bg-white/80 border border-transparent'}`}
           >
             {t.myListings}
-            {tab === 'my' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-600 rounded-t-full" />}
           </button>
           <button
             onClick={() => setTab('fav')}
-            className={`pb-3 text-sm font-black transition-all relative ${tab === 'fav' ? 'text-emerald-600' : 'text-gray-400'}`}
+            className={`flex-1 py-3 text-[13px] font-black transition-all rounded-[1.5rem] ${tab === 'fav' ? 'bg-amber-50 text-amber-500 shadow-sm border border-amber-100/50' : 'bg-white/50 text-slate-400 hover:bg-white/80 border border-transparent'}`}
           >
             {t.favorites}
-            {tab === 'fav' && <div className="absolute bottom-0 left-0 right-0 h-1 bg-emerald-600 rounded-t-full" />}
           </button>
         </div>
 

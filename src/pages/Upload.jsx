@@ -103,26 +103,26 @@ const Upload = () => {
   ]
 
   return (
-    <div className="mx-auto max-w-md px-4 pt-6 pb-24">
+    <div className="mx-auto max-w-2xl px-4 pt-6 pb-24">
       <h1 className="text-2xl font-black text-gray-900 mb-6">{t.sellItem}</h1>
 
       <form onSubmit={submit} className="space-y-6">
         {/* Images */}
-        <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100">
-          <label className="block text-xs font-bold text-gray-400 uppercase tracking-wider mb-3">{t.productImages}</label>
+        <div className="bg-white/80 backdrop-blur-md p-5 rounded-[2rem] shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-white/60">
+          <label className="block text-xs font-black text-slate-400 uppercase tracking-wider mb-4">{t.productImages}</label>
           <div className="grid grid-cols-3 gap-3">
             {previews.map((url, idx) => (
-              <div key={idx} className="relative aspect-square rounded-xl overflow-hidden border border-gray-100 shadow-sm group bg-gray-50">
+              <div key={idx} className="relative aspect-square rounded-2xl overflow-hidden shadow-sm group bg-white/50 border border-white/50">
                 <img src={url} alt="preview" className="w-full h-full object-cover" />
-                <button type="button" onClick={() => removeImage(idx)} className="absolute top-1 right-1 bg-black/50 hover:bg-red-500 text-white w-6 h-6 rounded-full flex items-center justify-center backdrop-blur-sm transition-colors">
+                <button type="button" onClick={() => removeImage(idx)} className="absolute top-1 right-1 bg-black/50 hover:bg-rose-500 text-white w-6 h-6 rounded-full flex items-center justify-center backdrop-blur-sm transition-colors">
                   <div className="text-[10px]">✕</div>
                 </button>
               </div>
             ))}
             {images.length < 9 && (
-              <label className="aspect-square rounded-xl border-2 border-dashed border-gray-300 flex flex-col items-center justify-center text-gray-400 cursor-pointer hover:border-emerald-400 hover:bg-emerald-50 hover:text-emerald-600 transition-all group">
-                <div className="w-8 h-8 rounded-full bg-gray-100 group-hover:bg-emerald-100 flex items-center justify-center mb-2 transition-colors">
-                  <span className="text-xl leading-none mb-0.5">+</span>
+              <label className="aspect-square rounded-2xl border-2 border-dashed border-teal-200/50 bg-white/40 flex flex-col items-center justify-center text-teal-600/50 cursor-pointer hover:border-teal-300 hover:bg-white/60 hover:text-teal-600 transition-all group shadow-inner">
+                <div className="w-8 h-8 rounded-full bg-teal-50 group-hover:bg-teal-100 flex items-center justify-center mb-2 transition-colors">
+                  <span className="text-xl font-bold leading-none mb-0.5">+</span>
                 </div>
                 <div className="text-[10px] font-bold">{t.addPhoto}</div>
                 <input type="file" accept="image/*" multiple onChange={onImageChange} className="hidden" />
@@ -132,23 +132,23 @@ const Upload = () => {
         </div>
 
         {/* Basic Info */}
-        <div className="space-y-4">
+        <div className="bg-white/80 backdrop-blur-md p-5 rounded-[2rem] shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-white/60 space-y-4">
           <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">{t.title}</label>
-            <input value={title} onChange={e => setTitle(e.target.value)} placeholder={t.titlePlaceholder} className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-medium" />
+            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-2 ml-1">{t.title}</label>
+            <input value={title} onChange={e => setTitle(e.target.value)} placeholder={t.titlePlaceholder} className="w-full bg-white/60 border border-white/50 rounded-2xl p-4 text-[15px] focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:bg-white transition-all font-bold text-slate-700 shadow-sm" />
           </div>
 
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">{t.price}</label>
+              <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-2 ml-1">{t.price}</label>
               <div className="relative">
-                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400 font-bold">{currencySymbols[currency]}</span>
-                <input type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" className="w-full bg-gray-50 border border-gray-200 rounded-lg pl-12 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-bold text-emerald-600" />
+                <span className="absolute left-4 top-1/2 -translate-y-1/2 text-teal-600 font-bold">{currencySymbols[currency]}</span>
+                <input type="number" value={price} onChange={e => setPrice(e.target.value)} placeholder="0.00" className="w-full bg-white/60 border border-white/50 rounded-2xl pl-12 pr-4 py-4 text-[15px] focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:bg-white transition-all font-black text-teal-600 shadow-sm" />
               </div>
             </div>
             <div>
-              <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">{t.currency}</label>
-              <select value={currency} onChange={e => setCurrency(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all appearance-none font-medium text-gray-700">
+              <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-2 ml-1">{t.currency}</label>
+              <select value={currency} onChange={e => setCurrency(e.target.value)} className="w-full bg-white/60 border border-white/50 rounded-2xl px-4 py-4 text-[15px] focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:bg-white transition-all appearance-none font-bold text-slate-700 shadow-sm">
                 <option value="MYR">{t.currencyMYR}</option>
                 <option value="CNY">{t.currencyCNY}</option>
               </select>
@@ -156,29 +156,29 @@ const Upload = () => {
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">{t.category}</label>
+            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-2 ml-1">{t.category}</label>
             <div className="relative">
-              <select value={category} onChange={e => setCategory(e.target.value)} className="w-full bg-gray-50 border border-gray-200 rounded-lg px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all appearance-none font-medium text-gray-700">
+              <select value={category} onChange={e => setCategory(e.target.value)} className="w-full bg-white/60 border border-white/50 rounded-2xl px-4 py-4 text-[15px] focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:bg-white transition-all appearance-none font-bold text-slate-700 shadow-sm">
                 <option value="">{t.selectCategory}</option>
                 {categories.filter(c => c.key !== 'All').map(c => (
                   <option key={c.key} value={c.key}>{language === 'zh' ? c.zh : c.en}</option>
                 ))}
               </select>
-              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400">
+              <div className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-slate-400">
                 <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 9l6 6 6-6" /></svg>
               </div>
             </div>
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">{t.descriptionLabel}</label>
-            <textarea value={description} onChange={e => setDescription(e.target.value)} rows={4} placeholder={t.descPlaceholder} className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all resize-none" />
+            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-2 ml-1">{t.descriptionLabel}</label>
+            <textarea value={description} onChange={e => setDescription(e.target.value)} rows={4} placeholder={t.descPlaceholder} className="w-full bg-white/60 border border-white/50 rounded-2xl p-4 text-[15px] focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:bg-white transition-all resize-none shadow-sm text-slate-700 font-medium" />
           </div>
 
           <div>
-            <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5 ml-1">{t.tags}</label>
-            <input value={tagsInput} onChange={e => setTagsInput(e.target.value)} placeholder={language === 'zh' ? '#99新 #急出' : '#like-new #urgent'} className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all" />
-            <div className="flex flex-wrap gap-2 mt-2 px-1">
+            <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-2 ml-1">{t.tags}</label>
+            <input value={tagsInput} onChange={e => setTagsInput(e.target.value)} placeholder={language === 'zh' ? '#99新 #急出' : '#like-new #urgent'} className="w-full bg-white/60 border border-white/50 rounded-2xl p-4 text-[15px] focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:bg-white transition-all shadow-sm font-medium text-slate-700" />
+            <div className="flex flex-wrap gap-2 mt-3 px-1">
               {quickTags.map(p => (
                 <button type="button" key={p.key} onClick={() => {
                   const toAdd = t[p.key]
@@ -193,45 +193,45 @@ const Upload = () => {
         </div>
 
         {/* Location */}
-        <div className="space-y-3 pt-2">
-          <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">{t.location}</label>
-          <input value={locationName} onChange={e => setLocationName(e.target.value)} placeholder={t.locationPlaceholder} list="location-suggestions" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all" />
+        <div className="bg-white/80 backdrop-blur-md p-5 rounded-[2rem] shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-white/60 space-y-4">
+          <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-2 ml-1">{t.location}</label>
+          <input value={locationName} onChange={e => setLocationName(e.target.value)} placeholder={t.locationPlaceholder} list="location-suggestions" className="w-full bg-white/60 border border-white/50 rounded-2xl p-4 text-[15px] focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:bg-white transition-all shadow-sm font-medium text-slate-700" />
           <datalist id="location-suggestions">
             {locations.map((loc, index) => (<option key={index} value={loc} />))}
           </datalist>
-          <div className="h-48 w-full rounded-xl overflow-hidden shadow-inner relative z-0">
+          <div className="h-48 w-full rounded-[1.5rem] overflow-hidden relative z-0 border border-white/50 shadow-sm bg-slate-50">
             <MapContainer center={latlng} zoom={15} style={{ height: '100%', width: '100%' }}>
               <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>' />
               <Marker position={latlng} />
               <ClickPicker />
             </MapContainer>
-            <div className="absolute top-2 right-2 bg-white/90 backdrop-blur px-2 py-1 rounded text-[10px] font-bold text-gray-500 z-[400] pointer-events-none border border-gray-100">
+            <div className="absolute top-3 right-3 bg-white/90 backdrop-blur px-3 py-1.5 rounded-full text-[11px] font-bold text-teal-600 shadow-sm z-[400] pointer-events-none border border-white">
               {t.tapToPickLocation}
             </div>
           </div>
         </div>
 
         {/* Contact */}
-        <div className="bg-emerald-50/50 p-5 rounded-2xl border border-emerald-100/50 space-y-4">
-          <label className="block text-xs font-bold text-emerald-800 uppercase tracking-wider">{t.contactMethods}</label>
+        <div className="bg-white/80 backdrop-blur-md p-5 rounded-[2rem] shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-white/60 space-y-4">
+          <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-2 ml-1">{t.contactMethods}</label>
           <div className="space-y-3">
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-green-100 text-green-600 flex items-center justify-center shrink-0">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" /></svg>
+              <div className="w-10 h-10 rounded-full bg-teal-50 text-teal-600 flex items-center justify-center shrink-0 shadow-sm border border-teal-100/50">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M22 16.92v3a2 2 0 0 1-2.18 2 19.79 19.79 0 0 1-8.63-3.07 19.5 19.5 0 0 1-6-6 19.79 19.79 0 0 1-3.07-8.67A2 2 0 0 1 4.11 2h3a2 2 0 0 1 2 1.72 12.84 12.84 0 0 0 .7 2.81 2 2 0 0 1-.45 2.11L8.09 9.91a16 16 0 0 0 6 6l1.27-1.27a2 2 0 0 1 2.11-.45 12.84 12.84 0 0 0 2.81.7A2 2 0 0 1 22 16.92z" /></svg>
               </div>
-              <input value={whatsapp} onChange={e => setWhatsapp(e.target.value)} placeholder="WhatsApp Number" className="flex-1 bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
+              <input value={whatsapp} onChange={e => setWhatsapp(e.target.value)} placeholder="WhatsApp Number" className="flex-1 bg-white/60 border border-white/50 rounded-2xl px-4 py-3.5 text-[15px] focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:bg-white shadow-sm font-medium" />
             </div>
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-blue-100 text-blue-600 flex items-center justify-center shrink-0">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
+              <div className="w-10 h-10 rounded-full bg-blue-50 text-blue-600 flex items-center justify-center shrink-0 shadow-sm border border-blue-100/50">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" /></svg>
               </div>
-              <input value={wechat} onChange={e => setWechat(e.target.value)} placeholder="WeChat ID" className="flex-1 bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
+              <input value={wechat} onChange={e => setWechat(e.target.value)} placeholder="WeChat ID" className="flex-1 bg-white/60 border border-white/50 rounded-2xl px-4 py-3.5 text-[15px] focus:outline-none focus:ring-2 focus:ring-blue-500/20 focus:bg-white shadow-sm font-medium" />
             </div>
             <div className="flex items-center gap-3">
-              <div className="w-8 h-8 rounded-full bg-pink-100 text-pink-600 flex items-center justify-center shrink-0">
-                <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5" /><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" /><line x1="17.5" y1="6.5" x2="17.51" y2="6.5" /></svg>
+              <div className="w-10 h-10 rounded-full bg-pink-50 text-pink-600 flex items-center justify-center shrink-0 shadow-sm border border-pink-100/50">
+                <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><rect x="2" y="2" width="20" height="20" rx="5" ry="5" /><path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" /><line x1="17.5" y1="6.5" x2="17.51" y2="6.5" /></svg>
               </div>
-              <input value={instagram} onChange={e => setInstagram(e.target.value)} placeholder="Instagram Handle" className="flex-1 bg-white border border-gray-200 rounded-xl px-3 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500/20" />
+              <input value={instagram} onChange={e => setInstagram(e.target.value)} placeholder="Instagram Handle" className="flex-1 bg-white/60 border border-white/50 rounded-2xl px-4 py-3.5 text-[15px] focus:outline-none focus:ring-2 focus:ring-pink-500/20 focus:bg-white shadow-sm font-medium" />
             </div>
           </div>
         </div>
@@ -239,7 +239,7 @@ const Upload = () => {
         <LoadingButton
           type="submit"
           loading={submitting}
-          className="w-full bg-emerald-500 hover:bg-emerald-600 text-white font-bold py-4 rounded-full shadow-lg shadow-emerald-200 active:scale-95 transition-all text-sm uppercase tracking-widest mt-8"
+          className="w-full bg-[#00b478] hover:bg-[#009c69] text-white font-bold py-4 rounded-[2rem] shadow-[0_8px_20px_rgba(0,180,120,0.3)] active:scale-95 transition-all text-[15px] uppercase tracking-widest mt-8 flex justify-center items-center h-[56px]"
         >
           {t.listItem}
         </LoadingButton>

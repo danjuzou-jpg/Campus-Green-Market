@@ -61,7 +61,7 @@ const ChatRoom = () => {
   }
 
   return (
-    <div className="mx-auto max-w-md h-screen flex flex-col bg-gray-50 fixed inset-0 z-[60]">
+    <div className="mx-auto max-w-2xl h-screen flex flex-col bg-gray-50 fixed inset-0 z-[60]">
       {/* Header */}
       <div className="bg-white border-b px-4 py-3 flex items-center gap-3 shrink-0">
         <button onClick={() => navigate(-1)} className="p-1 -ml-1">

@@ -91,7 +91,7 @@ const EditProduct = () => {
     }
 
     return (
-        <div className="mx-auto max-w-md px-4 pt-6 pb-24">
+        <div className="mx-auto max-w-2xl px-4 pt-6 pb-24">
             <div className="flex items-center gap-3 mb-6">
                 <button onClick={() => navigate(-1)} className="p-1 -ml-1 text-gray-600">
                     <ArrowLeft size={24} />

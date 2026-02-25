@@ -1,8 +1,8 @@
 import React, { useMemo, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMarketplace } from '../context/MarketplaceContext.jsx'
-import { Search, MapPin, Navigation, ChevronLeft, ChevronRight, Heart, ShieldAlert, Clock, X } from 'lucide-react'
 import { SkeletonCard } from '../components/Skeleton.jsx'
+import { Search, Menu, X, LayoutGrid, MonitorSmartphone, Sparkles, Sofa, BookOpen, Gamepad2, Building2, Package } from 'lucide-react'
 
 const fmtDate = (ts, lang) => {
   const d = new Date(ts)
@@ -26,7 +26,7 @@ const Home = () => {
   const [activeLoc, setActiveLoc] = useState('All Locations')
   const [distance, setDistance] = useState('Any')
   const [toast, setToast] = useState('')
-  const [isSidebarOpen, setIsSidebarOpen] = useState(true)
+  const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [showSearchPanel, setShowSearchPanel] = useState(false)
 
   // 搜索历史
@@ -129,245 +129,168 @@ const Home = () => {
   }, [listings, term, activeCat, activeLoc, normalize, distance, userLocation])
 
   return (
-    <div className="flex flex-col md:flex-row min-h-[calc(100vh-64px-60px)] bg-gray-50/50">
-      {/* 区域 A: 商品分类 */}
-      <div className={`bg-white border-b md:border-b-0 md:border-r border-gray-100 overflow-x-auto md:overflow-y-auto whitespace-nowrap md:whitespace-normal flex flex-row md:flex-col scrollbar-hide z-20 md:h-[calc(100vh-64px)] md:sticky md:top-[64px] transition-all duration-300 ${isSidebarOpen ? 'w-full md:w-64' : 'w-full md:w-16'}`}>
-        <div className="p-4 md:p-6 text-xs font-black text-gray-400 uppercase tracking-widest hidden md:flex items-center justify-between">
-          {isSidebarOpen && t.categories}
-          <button
-            onClick={() => setIsSidebarOpen(!isSidebarOpen)}
-            className="p-1 hover:bg-gray-100 rounded-full text-gray-500 transition-colors"
-          >
-            {isSidebarOpen ? <ChevronLeft size={16} /> : <ChevronRight size={16} />}
-          </button>
-        </div>
+    <div className="min-h-screen pb-24 relative">
 
-        {categories.map(cat => (
-          <button
-            key={cat.key}
-            onClick={() => setActiveCat(cat.key)}
-            className={`relative py-2 md:py-3 px-5 md:px-6 text-xs font-bold transition-all inline-block md:flex md:items-center rounded-full md:rounded-none md:rounded-r-full mr-2 md:mr-4 md:ml-0 my-1 md:my-0.5 ${activeCat === cat.key
-              ? 'bg-emerald-600 text-white md:bg-emerald-50 md:text-emerald-600 md:border-l-4 md:border-emerald-500 shadow-md md:shadow-none'
-              : 'text-gray-500 hover:bg-gray-50 md:hover:bg-gray-50'
-              }`}
-            title={language === 'zh' ? cat.zh : cat.en}
-          >
-            <div className={`text-center truncate w-full md:text-left ${!isSidebarOpen && 'md:hidden'}`}>
-              {language === 'zh' ? cat.zh : cat.en}
+      {/* Search Bar with Menu toggle */}
+      <div className="px-6 pt-4 pb-4 flex items-center gap-3 relative z-10">
+        <button
+          onClick={() => setIsSidebarOpen(true)}
+          className="w-12 h-12 shrink-0 rounded-full bg-white/80 backdrop-blur-md shadow-sm border border-white/50 flex items-center justify-center text-slate-500 hover:text-teal-600 active:scale-95 transition-all outline-none"
+        >
+          <Menu size={20} />
+        </button>
+
+        <div className="flex-1 bg-white/80 backdrop-blur-md shadow-sm border border-white/50 rounded-full flex items-center px-4 py-3 transition-shadow focus-within:shadow-md focus-within:bg-white">
+          <Search size={18} className="text-slate-400 mr-2 shrink-0" />
+          <input
+            type="text"
+            value={term}
+            onChange={e => setTerm(e.target.value)}
+            onKeyDown={handleSearch}
+            placeholder={t.searchPlaceholder || "Search Citrus..."}
+            className="bg-transparent border-none outline-none text-slate-700 placeholder-slate-400 font-bold text-[13px] w-full"
+          />
+        </div>
+      </div>
+
+      {/* Categories Drawer Overlay */}
+      {isSidebarOpen && (
+        <div className="fixed inset-0 z-[100] flex">
+          {/* Backdrop */}
+          <div
+            className="absolute inset-0 bg-slate-900/20 backdrop-blur-sm transition-opacity"
+            onClick={() => setIsSidebarOpen(false)}
+          ></div>
+
+          {/* Drawer */}
+          <div className="relative w-72 h-full bg-white/95 backdrop-blur-xl shadow-2xl border-r border-white/60 flex flex-col transform transition-transform duration-300">
+            <div className="p-6 flex items-center justify-between border-b border-slate-100">
+              <h2 className="text-xl font-black text-slate-800 tracking-tight">{t.categories}</h2>
+              <button
+                onClick={() => setIsSidebarOpen(false)}
+                className="p-2 rounded-full hover:bg-slate-100 active:bg-slate-200 text-slate-400 transition-colors"
+              >
+                <X size={20} />
+              </button>
             </div>
-            {!isSidebarOpen && (
-              <div className="hidden md:flex justify-center w-full">
-                <span className="text-lg leading-none">•</span>
+            <div className="p-4 flex-1 overflow-y-auto">
+              <div className="flex flex-col gap-2">
+                {categories.map((cat) => {
+                  const isSelected = activeCat === cat.key
+                  return (
+                    <button
+                      key={cat.key}
+                      onClick={() => {
+                        setActiveCat(cat.key)
+                        setIsSidebarOpen(false)
+                      }}
+                      className={`flex items-center gap-4 w-full p-3 rounded-2xl transition-all active:scale-95 ${isSelected ? 'bg-teal-50 text-teal-700 shadow-sm border border-teal-100/50' : 'hover:bg-slate-50 text-slate-600 border border-transparent'}`}
+                    >
+                      <div className={`w-10 h-10 shrink-0 rounded-[12px] flex items-center justify-center shadow-sm overflow-hidden ${isSelected ? 'bg-white text-teal-600' : 'bg-slate-100 text-slate-500'}`}>
+                        {cat.key === 'All' && <LayoutGrid size={20} />}
+                        {cat.key === 'Digital' && <MonitorSmartphone size={20} />}
+                        {cat.key === 'Fashion' && <Sparkles size={20} />}
+                        {cat.key === 'Home' && <Sofa size={20} />}
+                        {cat.key === 'Learning' && <BookOpen size={20} />}
+                        {cat.key === 'Hobbies' && <Gamepad2 size={20} />}
+                        {cat.key === 'Rentals' && <Building2 size={20} />}
+                        {cat.key === 'Others' && <Package size={20} />}
+                      </div>
+                      <span className="font-bold text-[14px]">
+                        {language === 'zh' ? cat.zh : cat.en}
+                      </span>
+                    </button>
+                  )
+                })}
               </div>
-            )}
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* Filter and Location Pills (Simplified) */}
+      <div className="px-6 pb-4 flex items-center gap-3 overflow-x-auto scrollbar-hide">
+        <div className="relative shrink-0">
+          <select
+            value={distance}
+            onChange={(e) => setDistance(e.target.value)}
+            className="appearance-none pl-4 pr-8 py-2.5 rounded-full text-xs font-bold bg-white text-slate-500 shadow-sm outline-none cursor-pointer focus:ring-2 focus:ring-teal-100 transition-all"
+          >
+            <option value="Any">{t.distanceAny}</option>
+            <option value="1">1km</option>
+            <option value="3">3km</option>
+            <option value="5">5km</option>
+            <option value="10">10km</option>
+          </select>
+          <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none">
+            <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400"><path d="m6 9 6 6 6-6" /></svg>
+          </div>
+        </div>
+        {locations.map(loc => (
+          <button
+            key={loc}
+            onClick={() => setActiveLoc(loc)}
+            className={`px-5 py-2.5 rounded-full text-xs font-bold transition-all shadow-sm whitespace-nowrap ${activeLoc === loc
+              ? 'bg-[#10b981] text-white shadow-[0_4px_12px_rgba(16,185,129,0.3)]'
+              : 'bg-white text-slate-500 hover:bg-slate-50'
+              }`}
+          >
+            {loc}
           </button>
         ))}
       </div>
 
-      {/* 区域 B: 右侧内容 */}
-      <div className="w-full md:flex-1 flex flex-col overflow-hidden relative">
-        {/* Guest Banner */}
-        {!user.id && (
-          <div className="bg-blue-50 border-b border-blue-100 px-4 py-2 text-center text-xs font-bold text-blue-700">
-            {t.demoMode}
+      {/* Product Grid */}
+      <div className="px-6">
+        {loading.products ? (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 pb-24">
+            {[1, 2, 3, 4, 5, 6].map(i => <SkeletonCard key={i} />)}
           </div>
-        )}
-        {/* Verification Banner */}
-        {user.verificationStatus !== 'verified' && (
-          <div className="bg-orange-50 border-b border-orange-100 px-4 py-3 flex items-center justify-between">
-            <div className="flex items-center gap-2 text-orange-700">
-              <ShieldAlert size={16} className="shrink-0" />
-              <span className="text-xs font-bold">{t.unverifiedBanner}</span>
-            </div>
-            <button
-              onClick={() => navigate('/profile')}
-              className="text-[10px] bg-orange-100 text-orange-800 px-3 py-1 rounded-full font-black hover:bg-orange-200 transition-colors"
-            >
-              {t.goVerify}
-            </button>
-          </div>
-        )}
-
-        {/* 搜索栏 */}
-        <div className="sticky top-0 z-30 p-4 pb-2 bg-gradient-to-b from-gray-50 via-gray-50 to-transparent">
-          <div className="bg-white rounded-full shadow-lg shadow-emerald-500/5 border border-emerald-100 flex items-center p-1.5 transition-all hover:shadow-xl hover:shadow-emerald-500/10">
-            <div className="flex-1 flex items-center px-4 h-12">
-              <Search size={18} className="text-emerald-500 mr-3" />
-              <input
-                value={term}
-                onChange={e => setTerm(e.target.value)}
-                onFocus={() => setShowSearchPanel(true)}
-                onKeyDown={handleSearch}
-                placeholder={t.searchPlaceholder}
-                className="w-full bg-transparent text-sm font-medium text-gray-700 placeholder-gray-400 focus:outline-none"
-              />
-              {term && (
-                <button onClick={() => { setTerm(''); setShowSearchPanel(false) }} className="p-1 text-gray-400 hover:text-gray-600">
-                  <X size={14} />
-                </button>
-              )}
-            </div>
-            <button
-              onClick={handleGeoLocation}
-              className="w-10 h-10 bg-emerald-50 text-emerald-600 rounded-full flex items-center justify-center active:scale-90 transition-transform hover:bg-emerald-100"
-            >
-              <Navigation size={18} />
-            </button>
-          </div>
-
-          {/* 搜索建议面板 */}
-          {showSearchPanel && !term && (
-            <div className="absolute left-4 right-4 top-[72px] bg-white rounded-2xl shadow-xl border border-gray-100 p-4 z-40">
-              {searchHistory.length > 0 && (
-                <div className="mb-4">
-                  <div className="flex items-center justify-between mb-2">
-                    <span className="text-xs font-bold text-gray-400 uppercase">{t.searchHistory}</span>
-                    <button onClick={clearHistory} className="text-[10px] text-gray-400 hover:text-red-500">{t.clearHistory}</button>
+        ) : filtered.length > 0 ? (
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 pb-24">
+            {filtered.map(item => (
+              <Link to={`/product/${item.id}`} key={item.id} className="block group">
+                <div className="bg-white/80 backdrop-blur-sm rounded-[2rem] p-3 shadow-sm hover:shadow-[0_12px_30px_rgba(0,0,0,0.06)] transition-all duration-300 h-full flex flex-col border border-white/60">
+                  {/* Image Container */}
+                  <div className="aspect-square w-full rounded-2xl overflow-hidden bg-slate-100 relative mb-4">
+                    <img
+                      src={item.imageUrl}
+                      alt={item.title}
+                      loading="lazy"
+                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                    />
                   </div>
-                  <div className="flex flex-wrap gap-2">
-                    {searchHistory.map((h, i) => (
-                      <button
-                        key={i}
-                        onClick={() => { setTerm(h); setShowSearchPanel(false) }}
-                        className="flex items-center gap-1 px-3 py-1.5 bg-gray-50 rounded-full text-xs text-gray-600 hover:bg-emerald-50 hover:text-emerald-600 transition-colors"
-                      >
-                        <Clock size={10} />
-                        {h}
+                  {/* Info */}
+                  <div className="flex flex-col flex-1 px-1">
+                    <h3 className="text-[13px] font-bold text-slate-800 leading-snug line-clamp-2 mb-1.5">{item.title}</h3>
+                    <p className="text-[15px] font-black text-[#10b981] mb-4">{item.currency === 'CNY' ? '¥' : 'RM'} {item.price}</p>
+
+                    {/* Action Row */}
+                    <div className="mt-auto flex items-center justify-between gap-2">
+                      <button className="flex-1 bg-emerald-50 text-emerald-600 py-2.5 rounded-2xl text-[13px] font-bold hover:bg-emerald-100 transition-colors">
+                        Buy Now
                       </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {hotTags.length > 0 && (
-                <div>
-                  <span className="text-xs font-bold text-gray-400 uppercase mb-2 block">{t.hotTags}</span>
-                  <div className="flex flex-wrap gap-2">
-                    {hotTags.map((tag, i) => (
-                      <button
-                        key={i}
-                        onClick={() => { setTerm(tag); setShowSearchPanel(false) }}
-                        className="px-3 py-1.5 bg-emerald-50 rounded-full text-xs text-emerald-600 font-medium hover:bg-emerald-100 transition-colors"
-                      >
-                        #{tag}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-              )}
-              {searchHistory.length === 0 && hotTags.length === 0 && (
-                <div className="text-center text-xs text-gray-400 py-4">{t.noItemsHint}</div>
-              )}
-            </div>
-          )}
-
-          {/* Filter Pills */}
-          <div className="flex items-center gap-2 overflow-x-auto whitespace-nowrap scrollbar-hide mt-3 px-1 pb-2">
-            <div className="shrink-0 relative">
-              <select
-                value={distance}
-                onChange={(e) => setDistance(e.target.value)}
-                className={`appearance-none pl-8 pr-4 py-1.5 rounded-full text-[10px] font-bold border shadow-sm transition-all cursor-pointer ${distance !== 'Any'
-                  ? 'bg-emerald-500 text-white border-emerald-500'
-                  : 'bg-white text-gray-500 border-gray-200 hover:border-emerald-200'
-                  }`}
-              >
-                <option value="Any">{t.distanceAny}</option>
-                <option value="1">1km</option>
-                <option value="3">3km</option>
-                <option value="5">5km</option>
-                <option value="10">10km</option>
-              </select>
-              <MapPin size={12} className={`absolute left-3 top-1/2 -translate-y-1/2 ${distance !== 'Any' ? 'text-white' : 'text-emerald-500'}`} />
-            </div>
-
-            <div className="w-px h-4 bg-gray-300 shrink-0 mx-1" />
-
-            {locations.map(loc => (
-              <button
-                key={loc}
-                onClick={() => setActiveLoc(loc)}
-                className={`px-4 py-1.5 rounded-full text-[10px] font-bold transition-all border shadow-sm ${activeLoc === loc
-                  ? 'bg-emerald-600 text-white border-emerald-600 shadow-emerald-200'
-                  : 'bg-white text-gray-500 border-gray-200 hover:border-emerald-200 hover:text-emerald-600'
-                  }`}
-              >
-                {loc}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* 点击其他区域关闭搜索面板 */}
-        {showSearchPanel && (
-          <div className="fixed inset-0 z-20" onClick={() => setShowSearchPanel(false)} />
-        )}
-
-        {/* Toast */}
-        {toast && (
-          <div className="fixed top-24 left-1/2 -translate-x-1/2 bg-emerald-900/90 backdrop-blur text-white text-xs px-4 py-2 rounded-full z-[100] animate-in slide-in-from-top-4 shadow-xl">
-            {toast}
-          </div>
-        )}
-
-        {/* 商品列表 */}
-        <div className="flex-1 overflow-y-auto p-4 pt-0">
-          {loading.products ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4 pb-24">
-              {[1, 2, 3, 4, 5, 6].map(i => <SkeletonCard key={i} />)}
-            </div>
-          ) : filtered.length > 0 ? (
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-4 pb-24">
-              {filtered.map(item => (
-                <Link to={`/product/${item.id}`} key={item.id} className="block group">
-                  <div className="bg-white rounded-xl border border-gray-100 shadow-sm overflow-hidden transition-all duration-300 hover:shadow-lg hover:shadow-emerald-500/10 hover:-translate-y-1 h-full flex flex-col">
-                    <div className="aspect-square w-full bg-gray-100 overflow-hidden relative">
-                      <img
-                        src={item.imageUrl}
-                        alt={item.title}
-                        loading="lazy"
-                        onError={(e) => { e.target.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 200 200%22%3E%3Crect fill=%22%23f3f4f6%22 width=%22200%22 height=%22200%22/%3E%3Ctext fill=%22%239ca3af%22 font-family=%22system-ui%22 font-size=%2214%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Image%3C/text%3E%3C/svg%3E' }}
-                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
-                      />
-                      <div className="absolute top-2 left-2 bg-black/40 backdrop-blur-md text-white text-[10px] px-2 py-0.5 rounded-full">
-                        {fmtDate(item.createdAt, language)}
-                      </div>
                       <button
                         onClick={(e) => {
                           e.preventDefault()
                           e.stopPropagation()
                           toggleFavorite(item.id)
                         }}
-                        className="absolute top-2 right-2 p-1.5 rounded-full bg-white/80 backdrop-blur-sm text-gray-400 hover:text-red-500 hover:bg-white transition-all shadow-sm active:scale-90"
+                        className={`w-10 h-10 shrink-0 flex items-center justify-center rounded-2xl transition-colors ${favorites.includes(item.id) ? 'bg-rose-50 text-rose-500' : 'bg-slate-50 text-slate-300 hover:bg-slate-100 hover:text-slate-400'}`}
                       >
-                        <Heart size={16} className={favorites.includes(item.id) ? 'fill-red-500 text-red-500' : ''} />
+                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" /></svg>
                       </button>
                     </div>
-                    <div className="p-3 flex flex-col flex-1">
-                      <h3 className="text-sm font-bold text-gray-800 truncate group-hover:text-emerald-600 transition-colors">{item.title}</h3>
-                      <div className="mt-auto pt-2 flex items-center justify-between">
-                        <span className="text-emerald-600 font-bold text-lg">{item.currency === 'CNY' ? '¥' : 'RM'} {item.price}</span>
-                        {item.locationName && (
-                          <div className="flex items-center text-gray-400 text-xs">
-                            <MapPin size={10} className="mr-0.5" />
-                            <span className="max-w-[60px] truncate">{item.locationName}</span>
-                          </div>
-                        )}
-                      </div>
-                    </div>
                   </div>
-                </Link>
-              ))}
-            </div>
-          ) : (
-            <div className="flex flex-col items-center justify-center h-64 text-gray-400">
-              <div className="w-16 h-16 bg-gray-100 rounded-full flex items-center justify-center mb-4 text-emerald-500">
-                <Search size={24} />
-              </div>
-              <p className="text-sm font-medium">{t.noItemsFound}</p>
-              <p className="text-xs text-gray-300 mt-1">{t.noItemsHint}</p>
-            </div>
-          )}
-        </div>
+                </div>
+              </Link>
+            ))}
+          </div>
+        ) : (
+          <div className="flex flex-col items-center justify-center h-48 text-slate-400">
+            <p className="text-sm font-medium">{t.noItemsFound}</p>
+          </div>
+        )}
       </div>
     </div>
   )

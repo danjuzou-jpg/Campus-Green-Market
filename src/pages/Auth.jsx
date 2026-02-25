@@ -8,7 +8,15 @@ import { Mail, Lock, User, ArrowRight, Eye, EyeOff } from 'lucide-react'
 const Auth = () => {
     const navigate = useNavigate()
     const { language, translations } = useMarketplace()
-    const [mode, setMode] = useState('login') // 'login' | 'register'
+    const [mode, setMode] = useState('login') // 'login' | 'register' | 'forgot' | 'update'
+
+    React.useEffect(() => {
+        // Detect if coming from a password recovery link
+        const hash = window.location.hash
+        if (hash && hash.includes('type=recovery')) {
+            setMode('update')
+        }
+    }, [])
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [fullName, setFullName] = useState('')
@@ -36,6 +44,16 @@ const Auth = () => {
             registerSuccess: '注册成功！请检查邮箱完成验证。',
             orContinueWith: '或者',
             guestMode: '先逛逛（游客模式）',
+            forgotPassword: '忘记密码？',
+            resetPasswordTitle: '重置密码',
+            resetPasswordSubtitle: '输入你的邮箱，我们将发送重置链接',
+            sendResetLink: '发送重置链接',
+            backToLogin: '返回登录',
+            resetEmailSent: '重置密码链接已发送至您的邮箱！请查收。',
+            newPasswordTitle: '设置新密码',
+            newPasswordSubtitle: '请输入您的新密码',
+            updatePassword: '更新密码',
+            passwordUpdated: '密码更新成功，请使用新密码登录！'
         },
         en: {
             loginTitle: 'Welcome Back',
@@ -55,6 +73,16 @@ const Auth = () => {
             registerSuccess: 'Registration successful! Please check your email to verify.',
             orContinueWith: 'or',
             guestMode: 'Browse as Guest',
+            forgotPassword: 'Forgot Password?',
+            resetPasswordTitle: 'Reset Password',
+            resetPasswordSubtitle: 'Enter your email to receive a reset link',
+            sendResetLink: 'Send Reset Link',
+            backToLogin: 'Back to Login',
+            resetEmailSent: 'Password reset link sent to your email! Please check.',
+            newPasswordTitle: 'Set New Password',
+            newPasswordSubtitle: 'Please enter your new password',
+            updatePassword: 'Update Password',
+            passwordUpdated: 'Password updated successfully! Please log in.'
         }
     }
 
@@ -74,7 +102,7 @@ const Auth = () => {
                 })
                 if (error) throw error
                 navigate('/home')
-            } else {
+            } else if (mode === 'register') {
                 const { error } = await supabase.auth.signUp({
                     email,
                     password,
@@ -86,6 +114,17 @@ const Auth = () => {
                 })
                 if (error) throw error
                 setSuccessMessage(text.registerSuccess)
+            } else if (mode === 'forgot') {
+                const { error } = await supabase.auth.resetPasswordForEmail(email, {
+                    redirectTo: `${window.location.origin}/auth`
+                })
+                if (error) throw error
+                setSuccessMessage(text.resetEmailSent)
+            } else if (mode === 'update') {
+                const { error } = await supabase.auth.updateUser({ password })
+                if (error) throw error
+                setSuccessMessage(text.passwordUpdated)
+                setTimeout(() => setMode('login'), 2000)
             }
         } catch (err) {
             console.error('Auth error:', err)
@@ -112,10 +151,10 @@ const Auth = () => {
                         <Logo />
                     </div>
                     <h1 className="text-2xl font-black text-gray-900">
-                        {mode === 'login' ? text.loginTitle : text.registerTitle}
+                        {mode === 'login' ? text.loginTitle : mode === 'register' ? text.registerTitle : mode === 'forgot' ? text.resetPasswordTitle : text.newPasswordTitle}
                     </h1>
                     <p className="text-sm text-gray-500 mt-1">
-                        {mode === 'login' ? text.loginSubtitle : text.registerSubtitle}
+                        {mode === 'login' ? text.loginSubtitle : mode === 'register' ? text.registerSubtitle : mode === 'forgot' ? text.resetPasswordSubtitle : text.newPasswordSubtitle}
                     </p>
                 </div>
 
@@ -143,48 +182,59 @@ const Auth = () => {
                         )}
 
                         {/* Email */}
-                        <div className="space-y-1.5">
-                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">
-                                {text.email}
-                            </label>
-                            <div className="relative">
-                                <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                                <input
-                                    type="email"
-                                    value={email}
-                                    onChange={(e) => setEmail(e.target.value)}
-                                    placeholder={text.emailPlaceholder}
-                                    required
-                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-11 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
-                                />
+                        {mode !== 'update' && (
+                            <div className="space-y-1.5">
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">
+                                    {text.email}
+                                </label>
+                                <div className="relative">
+                                    <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                                    <input
+                                        type="email"
+                                        value={email}
+                                        onChange={(e) => setEmail(e.target.value)}
+                                        placeholder={text.emailPlaceholder}
+                                        required
+                                        className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-11 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                                    />
+                                </div>
                             </div>
-                        </div>
+                        )}
 
                         {/* Password */}
-                        <div className="space-y-1.5">
-                            <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">
-                                {text.password}
-                            </label>
-                            <div className="relative">
-                                <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
-                                <input
-                                    type={showPassword ? 'text' : 'password'}
-                                    value={password}
-                                    onChange={(e) => setPassword(e.target.value)}
-                                    placeholder={text.passwordPlaceholder}
-                                    required
-                                    minLength={6}
-                                    className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-11 pr-11 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
-                                />
-                                <button
-                                    type="button"
-                                    onClick={() => setShowPassword(!showPassword)}
-                                    className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
-                                >
-                                    {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
-                                </button>
+                        {mode !== 'forgot' && (
+                            <div className="space-y-1.5">
+                                <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">
+                                    {mode === 'update' ? text.newPasswordTitle : text.password}
+                                </label>
+                                <div className="relative">
+                                    <Lock size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
+                                    <input
+                                        type={showPassword ? 'text' : 'password'}
+                                        value={password}
+                                        onChange={(e) => setPassword(e.target.value)}
+                                        placeholder={text.passwordPlaceholder}
+                                        required
+                                        minLength={6}
+                                        className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-11 pr-11 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => setShowPassword(!showPassword)}
+                                        className="absolute right-4 top-1/2 -translate-y-1/2 text-gray-400 hover:text-gray-600"
+                                    >
+                                        {showPassword ? <EyeOff size={16} /> : <Eye size={16} />}
+                                    </button>
+                                </div>
+                                {mode === 'login' && (
+                                    <div className="flex justify-end mt-1">
+                                        <button type="button" onClick={() => { setMode('forgot'); setError(''); setSuccessMessage(''); }} className="text-xs text-emerald-600 hover:text-emerald-700 font-medium">
+                                            {text.forgotPassword}
+                                        </button>
+                                    </div>
+                                )}
                             </div>
-                        </div>
+                        )}
 
                         {/* Error Message */}
                         {error && (
@@ -210,7 +260,7 @@ const Auth = () => {
                                 <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
                             ) : (
                                 <>
-                                    <span>{mode === 'login' ? text.login : text.register}</span>
+                                    <span>{mode === 'login' ? text.login : mode === 'register' ? text.register : mode === 'forgot' ? text.sendResetLink : text.updatePassword}</span>
                                     <ArrowRight size={16} />
                                 </>
                             )}
@@ -218,16 +268,29 @@ const Auth = () => {
                     </form>
 
                     {/* Switch Mode */}
-                    <button
-                        onClick={() => {
-                            setMode(mode === 'login' ? 'register' : 'login')
-                            setError('')
-                            setSuccessMessage('')
-                        }}
-                        className="w-full text-center text-sm text-emerald-600 font-bold mt-4 py-2 hover:text-emerald-700 transition-colors"
-                    >
-                        {mode === 'login' ? text.switchToRegister : text.switchToLogin}
-                    </button>
+                    {mode === 'login' || mode === 'register' ? (
+                        <button
+                            onClick={() => {
+                                setMode(mode === 'login' ? 'register' : 'login')
+                                setError('')
+                                setSuccessMessage('')
+                            }}
+                            className="w-full text-center text-sm text-emerald-600 font-bold mt-4 py-2 hover:text-emerald-700 transition-colors"
+                        >
+                            {mode === 'login' ? text.switchToRegister : text.switchToLogin}
+                        </button>
+                    ) : (
+                        <button
+                            onClick={() => {
+                                setMode('login')
+                                setError('')
+                                setSuccessMessage('')
+                            }}
+                            className="w-full text-center text-sm text-emerald-600 font-bold mt-4 py-2 hover:text-emerald-700 transition-colors"
+                        >
+                            {text.backToLogin}
+                        </button>
+                    )}
 
                     {/* Divider */}
                     <div className="flex items-center gap-4 my-4">
