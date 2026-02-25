@@ -779,6 +779,11 @@ export const MarketplaceProvider = ({ children }) => {
   const markConversationRead = async (conversationId) => {
     if (!session?.user) return
     try {
+      // Optimistic UI Update: 立即在本地清除未读数，让小红点瞬间消失
+      setConversations(prev => prev.map(c =>
+        c.id === conversationId ? { ...c, unreadCount: 0 } : c
+      ))
+
       // 判断当前用户是买家还是卖家
       const conv = conversations.find(c => c.id === conversationId)
       if (!conv) return
