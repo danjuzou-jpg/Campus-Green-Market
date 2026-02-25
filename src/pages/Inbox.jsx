@@ -52,13 +52,19 @@ const Inbox = () => {
                     </span>
                   </div>
                   <div className="text-[13px] text-teal-600 font-bold truncate mb-1">{conv.productTitle}</div>
-                  <div className="text-[13px] font-medium text-slate-500 truncate">
+                  <div className={`text-[13px] truncate ${conv.unreadCount > 0 ? 'font-bold text-slate-800' : 'font-medium text-slate-500'}`}>
                     {conv.lastMessage || t.tapToChat}
                   </div>
                 </div>
-                <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center shrink-0">
-                  <ChevronRight size={16} className="text-slate-400" />
-                </div>
+                {conv.unreadCount > 0 ? (
+                  <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center shrink-0 shadow-sm shadow-red-200">
+                    <span className="text-white text-[10px] font-bold">{conv.unreadCount > 99 ? '99+' : conv.unreadCount}</span>
+                  </div>
+                ) : (
+                  <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center shrink-0">
+                    <ChevronRight size={16} className="text-slate-400" />
+                  </div>
+                )}
               </button>
             ))}
           </div>
