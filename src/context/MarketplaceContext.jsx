@@ -17,7 +17,13 @@ const CATEGORY_DEF = [
 export const MarketplaceProvider = ({ children }) => {
   const [listings, setListings] = useState([])
   const [favorites, setFavorites] = useState([])
-  const [language, setLanguage] = useState('en')
+  const [language, setLanguage] = useState(() => {
+    return localStorage.getItem('app_language') || 'en'
+  })
+
+  useEffect(() => {
+    localStorage.setItem('app_language', language)
+  }, [language])
   const [session, setSession] = useState(null)
   const [user, setUser] = useState({
     name: 'Guest User',
