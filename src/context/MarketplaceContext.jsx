@@ -491,6 +491,12 @@ export const MarketplaceProvider = ({ children }) => {
         const mapped = data.map(c => {
           const isBuyer = c.buyer_id === userId
           const otherName = isBuyer ? c.seller_name : c.buyer_name // Assuming these fields exist for simplicity
+          const lastReadAt = isBuyer ? c.buyer_last_read_at : c.seller_last_read_at
+          const lastReadTime = lastReadAt ? new Date(lastReadAt).getTime() : 0
+
+          const unreadMsgs = c.messages.filter(m =>
+            m.sender_id !== userId && new Date(m.created_at).getTime() > lastReadTime
+          )
 
           return {
             id: c.id,
@@ -505,7 +511,8 @@ export const MarketplaceProvider = ({ children }) => {
               timestamp: new Date(m.created_at).getTime()
             })).sort((a, b) => a.timestamp - b.timestamp),
             lastMessage: c.last_message,
-            lastTimestamp: new Date(c.updated_at).getTime()
+            lastTimestamp: new Date(c.updated_at).getTime(),
+            unreadCount: unreadMsgs.length
           }
         })
         setConversations(mapped)
@@ -977,6 +984,10 @@ export const MarketplaceProvider = ({ children }) => {
     return null
   }
 
+  const unreadCount = useMemo(() => {
+    return conversations.reduce((total, conv) => total + (conv.unreadCount || 0), 0)
+  }, [conversations])
+
   const value = useMemo(() => ({
     listings,
     favorites,
@@ -1014,8 +1025,9 @@ export const MarketplaceProvider = ({ children }) => {
     showToast,
     clearToast,
     // 3.6 Report
-    reportContent
-  }), [listings, favorites, language, user, session, locations, normalize, conversations, userLocation, loading, toast])
+    reportContent,
+    unreadCount
+  }), [listings, favorites, language, user, session, locations, normalize, conversations, userLocation, loading, toast, unreadCount])
   return <MarketplaceContext.Provider value={value}>{children}</MarketplaceContext.Provider>
 }
 

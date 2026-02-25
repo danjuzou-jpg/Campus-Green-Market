@@ -4,13 +4,10 @@ import { useMarketplace } from '../context/MarketplaceContext.jsx'
 
 const BottomNav = () => {
   const navigate = useNavigate()
-  const { language, translations, conversations } = useMarketplace()
+  const { language, translations, conversations, unreadCount } = useMarketplace()
   const t = translations[language]
 
   const location = useLocation()
-
-  // 未读消息
-  const unreadCount = 0
 
   // Hide on detail pages
   const hidePaths = ['/product', '/chat', '/edit']
