@@ -1,7 +1,7 @@
-// 2NH Marketplace — Service Worker
+// green2H Marketplace — Service Worker
 // 缓存策略：Network First + Cache Fallback
 
-const CACHE_NAME = '2nh-v1'
+const CACHE_NAME = 'green2h-v1'
 const STATIC_ASSETS = [
     '/',
     '/index.html',

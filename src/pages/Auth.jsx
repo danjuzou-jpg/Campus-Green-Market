@@ -29,8 +29,8 @@ const Auth = () => {
         zh: {
             loginTitle: '欢迎回来',
             registerTitle: '创建账号',
-            loginSubtitle: '登录你的 2NH 账号',
-            registerSubtitle: '加入 2NH 校园二手市场',
+            loginSubtitle: '登录你的 2H 账号',
+            registerSubtitle: '加入 2H 校园二手市场',
             email: '邮箱地址',
             password: '密码',
             fullName: '你的昵称',
@@ -58,8 +58,8 @@ const Auth = () => {
         en: {
             loginTitle: 'Welcome Back',
             registerTitle: 'Create Account',
-            loginSubtitle: 'Sign in to your 2NH account',
-            registerSubtitle: 'Join the 2NH campus marketplace',
+            loginSubtitle: 'Sign in to your 2H account',
+            registerSubtitle: 'Join the 2H campus marketplace',
             email: 'Email',
             password: 'Password',
             fullName: 'Your Name',
@@ -311,7 +311,7 @@ const Auth = () => {
 
             {/* Bottom branding */}
             <div className="text-center pb-8">
-                <p className="text-[10px] text-gray-300 font-medium">2NH Marketplace — 2nd Hand, Made Easy</p>
+                <p className="text-[10px] text-gray-300 font-medium">2H Marketplace — 2nd Hand, Made Easy</p>
             </div>
         </div>
     )

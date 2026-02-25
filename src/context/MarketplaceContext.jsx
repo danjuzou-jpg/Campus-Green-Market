@@ -17,7 +17,7 @@ const CATEGORY_DEF = [
 export const MarketplaceProvider = ({ children }) => {
   const [listings, setListings] = useState([])
   const [favorites, setFavorites] = useState([])
-  const [language, setLanguage] = useState('zh')
+  const [language, setLanguage] = useState('en')
   const [session, setSession] = useState(null)
   const [user, setUser] = useState({
     name: 'Guest User',
