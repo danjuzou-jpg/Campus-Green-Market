@@ -4,9 +4,10 @@ import BottomNav from './BottomNav.jsx'
 import Logo from './Logo'
 import { Languages } from 'lucide-react'
 import { useMarketplace } from '../context/MarketplaceContext.jsx'
+import Toast from './Toast.jsx'
 
 const Layout = () => {
-  const { language, toggleLanguage } = useMarketplace()
+  const { language, toggleLanguage, toast, clearToast } = useMarketplace()
   const label = language === 'zh' ? '🌐 中文 / EN' : '🌐 EN / 中文'
   return (
     <div className="min-h-screen bg-white">
@@ -24,6 +25,7 @@ const Layout = () => {
         <Outlet />
       </div>
       <BottomNav />
+      <Toast toast={toast} onClose={clearToast} />
     </div>
   )
 }

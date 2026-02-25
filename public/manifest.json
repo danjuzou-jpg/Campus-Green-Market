@@ -1,0 +1,30 @@
+{
+    "name": "2NH Marketplace",
+    "short_name": "2NH",
+    "description": "Campus second-hand marketplace for university students — 校园二手交易平台",
+    "start_url": "/",
+    "display": "standalone",
+    "background_color": "#ffffff",
+    "theme_color": "#10b981",
+    "orientation": "portrait",
+    "icons": [
+        {
+            "src": "/icons/icon-192.png",
+            "sizes": "192x192",
+            "type": "image/png",
+            "purpose": "any maskable"
+        },
+        {
+            "src": "/icons/icon-512.png",
+            "sizes": "512x512",
+            "type": "image/png",
+            "purpose": "any maskable"
+        }
+    ],
+    "categories": [
+        "shopping",
+        "education"
+    ],
+    "lang": "en",
+    "dir": "ltr"
+}

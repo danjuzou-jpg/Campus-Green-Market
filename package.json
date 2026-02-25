@@ -1,6 +1,6 @@
 {
   "name": "secondhand_market_2nh",
-  "version": "0.0.0",
+  "version": "1.0.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -9,6 +9,7 @@
     "preview": "vite preview"
   },
   "dependencies": {
+    "@supabase/supabase-js": "^2.95.3",
     "leaflet": "^1.9.4",
     "lucide-react": "^0.462.0",
     "react": "^18.2.0",

@@ -2,11 +2,43 @@
 <html lang="en">
   <head>
     <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>2NH Marketplace</title>
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
+
+    <!-- SEO -->
+    <title>2NH Marketplace — Campus Second-Hand Market</title>
+    <meta name="description" content="2NH Marketplace: A safe campus second-hand marketplace for Malaysian university students. Buy and sell pre-loved items within your campus community. 校园二手交易平台" />
+    <meta name="keywords" content="2NH, marketplace, second-hand, campus, university, Malaysia, UM, student, 二手, 校园, 闲置" />
+    <meta name="author" content="2NH Team" />
+
+    <!-- Open Graph -->
+    <meta property="og:title" content="2NH Marketplace — Campus Second-Hand Market" />
+    <meta property="og:description" content="Safe campus trading platform for university students" />
+    <meta property="og:type" content="website" />
+    <meta property="og:url" content="https://2nh.market" />
+
+    <!-- PWA -->
+    <meta name="theme-color" content="#10b981" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
+    <meta name="apple-mobile-web-app-title" content="2NH" />
+    <link rel="manifest" href="/manifest.json" />
+    <link rel="apple-touch-icon" href="/icons/icon-192.png" />
+
+    <!-- Favicon -->
+    <link rel="icon" type="image/svg+xml" href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'%3E%3Ctext y='.9em' font-size='90'%3E🛍️%3C/text%3E%3C/svg%3E" />
   </head>
   <body class="bg-white">
     <div id="root"></div>
     <script type="module" src="/src/main.jsx"></script>
+    <script>
+      // Register Service Worker
+      if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+          navigator.serviceWorker.register('/sw.js')
+            .then(reg => console.log('[SW] Registered:', reg.scope))
+            .catch(err => console.warn('[SW] Registration failed:', err))
+        })
+      }
+    </script>
   </body>
   </html>

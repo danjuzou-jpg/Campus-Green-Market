@@ -1,4 +1,5 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import { supabase } from '../lib/supabaseClient'
 
 const MarketplaceContext = createContext(null)
 
@@ -13,209 +14,821 @@ const CATEGORY_DEF = [
   { key: 'Others', en: 'Others', zh: '其他' }
 ]
 
-const defaultProducts = [
-  {
-    id: 'cam-1',
-    title: 'Mirrorless Camera',
-    price: 1200,
-    imageUrl: 'https://images.unsplash.com/photo-1516035069371-29a1b244cc32?w=500&q=80',
-    description: 'Well-maintained mirrorless camera, includes kit lens.',
-    createdAt: Date.now() - 1000 * 60 * 60 * 6,
-    contact: '60123456789',
-    category: 'Digital',
-    owner: 'others'
-  },
-  {
-    id: 'sne-1',
-    title: 'Sneakers',
-    price: 180,
-    imageUrl: 'https://images.unsplash.com/photo-1542291026-7eec264c27ff?w=500&q=80',
-    description: 'Comfortable sneakers, lightly used.',
-    createdAt: Date.now() - 1000 * 60 * 60 * 24,
-    contact: '60123456789',
-    category: 'Fashion',
-    owner: 'others'
-  },
-  {
-    id: 'hp-1',
-    title: 'Headphones',
-    price: 250,
-    imageUrl: 'https://images.unsplash.com/photo-1505740420928-5e560c06d30e?w=500&q=80',
-    description: 'Noise-cancelling over-ear headphones.',
-    createdAt: Date.now() - 1000 * 60 * 60 * 2,
-    contact: '60123456789',
-    category: 'Digital',
-    owner: 'others'
-  },
-  {
-    id: 'fur-1',
-    title: 'Minimalist Chair',
-    price: 320,
-    imageUrl: 'https://images.unsplash.com/photo-1592078615290-033ee584e267?w=500&q=80',
-    description: 'Minimalist chair, solid wood with modern design.',
-    createdAt: Date.now() - 1000 * 60 * 60 * 36,
-    contact: '60123456789',
-    category: 'Home',
-    owner: 'others'
-  },
-  {
-    id: 'watch-1',
-    title: 'Classic Watch',
-    price: 560,
-    imageUrl: 'https://images.unsplash.com/photo-1524592094714-0f0654e20314?w=500&q=80',
-    description: 'Elegant classic watch, works perfectly.',
-    createdAt: Date.now() - 1000 * 60 * 60 * 12,
-    contact: '60123456789',
-    category: 'Digital',
-    owner: 'others'
-  },
-  {
-    id: 'guitar-1',
-    title: 'Acoustic Guitar',
-    price: 400,
-    imageUrl: 'https://images.unsplash.com/photo-1511379938547-c1f69419868d?w=500&q=80',
-    description: 'Warm tone acoustic guitar, great for beginners.',
-    createdAt: Date.now() - 1000 * 60 * 60 * 72,
-    contact: '60123456789',
-    category: 'Learning',
-    owner: 'others'
-  }
-]
-
 export const MarketplaceProvider = ({ children }) => {
-  const STORAGE_KEY = 'marketplace_data_v2'
   const [listings, setListings] = useState([])
   const [favorites, setFavorites] = useState([])
   const [language, setLanguage] = useState('zh')
-  const [user, setUser] = useState({ name: 'Guest User', school: 'Universiti Malaya (UM)', verified: false, avatar: 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&q=80' })
+  const [session, setSession] = useState(null)
+  const [user, setUser] = useState({
+    name: 'Guest User',
+    school: 'Universiti Malaya (UM)',
+    verified: false,
+    verificationStatus: 'unverified',
+    avatar: 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&q=80'
+  })
   const [locations, setLocations] = useState(['All Locations', 'Ryan & Miho', 'Pacific Tower', 'South Link', 'UM Library', 'Jaya One'])
+
+  // Ensure locations are unique
+  const uniqueLocations = useMemo(() => [...new Set(locations)], [locations])
+
+  const [conversations, setConversations] = useState([])
+  const [userLocation, setUserLocation] = useState(null)
+
+  // ── 3.1 Loading 状态 ──
+  const [loading, setLoading] = useState({ products: true, profile: false })
+
+  // ── 3.2 Toast 通知状态 ──
+  const [toast, setToast] = useState(null)
+  const showToast = (type, message, duration = 3000) => {
+    setToast({ type, message, duration })
+  }
+  const clearToast = () => setToast(null)
 
   const normalize = (str) => str.toLowerCase().replace(/[^a-z0-9]/g, '');
 
   const translations = useMemo(() => ({
     en: {
+      // 导航
       home: 'Home',
       sell: 'Sell',
+      inbox: 'Inbox',
       me: 'Me',
+      // 通用
       price: 'Price',
       description: 'Description',
       contact: 'Contact',
       searchPlaceholder: 'Search products, brands, keywords',
+      logout: 'Log Out',
+      chat: 'Chat',
+      send: 'Send',
+      save: 'Save',
+      cancel: 'Cancel',
+      confirm: 'Confirm',
+      delete: 'Delete',
+      edit: 'Edit',
+      loading: 'Loading...',
+      noItemsFound: 'No items found',
+      noItemsHint: 'Try changing your search or filters',
+      // Welcome 页
+      welcomeTitle: 'Campus Second-Hand Market',
+      welcomeSubtitle: 'Safe, Green, Convenient',
+      welcomeFeature1Title: 'Verified Students',
+      welcomeFeature1Desc: 'Trade only with verified campus members',
+      welcomeFeature2Title: 'Eco-Friendly',
+      welcomeFeature2Desc: 'Give your pre-loved items a second life',
+      getStarted: 'Get Started',
+      // 认证
       verifyStudent: 'Verify Student ID',
       verified: 'Verified',
       verifiedStudent: 'Verified Student',
-      logout: 'Log Out'
+      verificationPending: 'Verification Pending',
+      verifyNow: 'Verify Now',
+      verification: 'Verification',
+      campusEmail: 'Campus Email',
+      verificationCode: 'Code',
+      sendCode: 'Send',
+      verifyInstantly: 'Verify Instantly',
+      uploadIdCard: 'ID Card',
+      uploadHint: 'Upload Student ID / Letter',
+      uploadFormats: 'Supported formats: JPG, PNG, PDF (Max 5MB)',
+      reviewHint: '💡 Manual review usually takes 24 hours. You will receive a notification once verified.',
+      submitForReview: 'Submit for Review',
+      sendingCode: 'Sending...',
+      codeSent: 'Code sent! Check your email.',
+      resendIn: 'Resend in',
+      unverifiedBanner: 'You are unverified. Verification is required to chat.',
+      goVerify: 'Verify',
+      verifyToChat: 'Verify to Chat',
+      verifyToContact: 'Verify to Contact',
+      verifyRequired: 'Verification required to view contact info',
+      verifiedBadge: 'Verified',
+      pendingBadge: 'Pending',
+      // 商品
+      productDesc: 'Description',
+      noDescription: 'No description provided',
+      // 首页
+      categories: 'Categories',
+      distanceAny: 'Distance: Any',
+      demoMode: 'Demo Mode: Verification status simulated as unverified',
+      // 发布
+      sellItem: 'Sell Item',
+      productImages: 'Product Images (Max 9)',
+      addPhoto: 'Add Photo',
+      title: 'Title',
+      titlePlaceholder: 'e.g., Nike Dunk Low',
+      currency: 'Currency',
+      currencyMYR: 'Malaysian Ringgit (RM)',
+      currencyCNY: 'Chinese Yuan (¥)',
+      category: 'Category',
+      selectCategory: 'Select',
+      descriptionLabel: 'Description',
+      descPlaceholder: 'Describe your item...',
+      tags: 'Tags',
+      location: 'Location',
+      locationPlaceholder: 'e.g., South Link, UM Library',
+      contactMethods: 'Contact Methods (Min 1)',
+      listItem: 'List Item',
+      tapToPickLocation: 'Tap to pick location',
+      tagNegotiable: 'Negotiable',
+      tagUrgent: 'Urgent',
+      tagNew: 'New',
+      tagDelivery: 'Delivery',
+      maxImages: 'You can upload up to 9 images',
+      titleRequired: 'Title is required',
+      priceRequired: 'Price is required',
+      categoryRequired: 'Please select a category',
+      locationRequired: 'Please enter location name',
+      contactRequired: 'At least one contact method is required!',
+      publishFailed: 'Failed to publish. Please try again.',
+      // 商品详情
+      saved: 'Saved',
+      addToFavorites: 'Add to Favorites',
+      wechatCopied: 'WeChat ID Copied',
+      viewItem: 'View Item',
+      // 个人中心
+      myInbox: 'My Inbox',
+      editProfile: 'Edit Profile',
+      myListings: 'My Listings',
+      favorites: 'Favorites',
+      noListings: 'No listings yet',
+      noFavorites: 'No favorites yet',
+      confirmDelete: 'Confirm to delete this item?',
+      confirmLogout: 'Are you sure to log out?',
+      username: 'Username',
+      schoolName: 'School Name',
+      saveChanges: 'Save Changes',
+      // 消息
+      noMessages: 'No messages yet',
+      tapToChat: 'Tap to start chatting',
+      typeMessage: 'Type a message...',
+      safetyTip: 'Verify student status before trading',
+      online: 'Online',
+      // 编辑商品
+      editProduct: 'Edit Product',
+      updateProduct: 'Update Product',
+      editSuccess: 'Product updated successfully',
+      // 搜索
+      searchHistory: 'Recent Searches',
+      clearHistory: 'Clear',
+      hotTags: 'Popular Tags',
     },
     zh: {
+      // 导航
       home: '首页',
       sell: '卖闲置',
+      inbox: '消息',
       me: '我的',
+      // 通用
       price: '价格',
       description: '详情',
       contact: '联系卖家',
       searchPlaceholder: '搜索商品、品牌、关键词',
+      logout: '退出登录',
+      chat: '私聊',
+      send: '发送',
+      save: '保存',
+      cancel: '取消',
+      confirm: '确认',
+      delete: '删除',
+      edit: '编辑',
+      loading: '加载中...',
+      noItemsFound: '没有找到商品',
+      noItemsHint: '试试换个搜索条件或筛选',
+      // Welcome 页
+      welcomeTitle: '校园二手市场',
+      welcomeSubtitle: '安全 · 环保 · 便捷',
+      welcomeFeature1Title: '学生认证',
+      welcomeFeature1Desc: '仅与已认证的校园成员交易',
+      welcomeFeature2Title: '绿色环保',
+      welcomeFeature2Desc: '让闲置物品焕发新生',
+      getStarted: '开始使用',
+      // 认证
       verifyStudent: '认证学生身份',
       verified: '已认证',
       verifiedStudent: '已认证学生',
-      logout: '退出登录'
+      verificationPending: '审核中',
+      verifyNow: '立即认证',
+      verification: '身份认证',
+      campusEmail: '校园邮箱',
+      verificationCode: '验证码',
+      sendCode: '发送',
+      verifyInstantly: '立即验证',
+      uploadIdCard: '证件上传',
+      uploadHint: '上传学生证 / 在读证明',
+      uploadFormats: '支持格式：JPG、PNG、PDF（最大5MB）',
+      reviewHint: '💡 人工审核通常需要24小时，审核通过后会通知你。',
+      submitForReview: '提交审核',
+      sendingCode: '发送中...',
+      codeSent: '验证码已发送！请查看邮箱。',
+      resendIn: '重新发送',
+      unverifiedBanner: '您尚未完成学生认证，无法联系卖家',
+      goVerify: '去认证',
+      verifyToChat: '认证后开启聊天',
+      verifyToContact: '认证后联系',
+      verifyRequired: '为保护隐私，请先完成学生认证',
+      verifiedBadge: '已认证 / Verified',
+      pendingBadge: '审核中 / Pending',
+      // 商品
+      productDesc: '商品描述',
+      noDescription: '暂无描述',
+      // 首页
+      categories: '分类',
+      distanceAny: '距离: 不限',
+      demoMode: '正在演示模式：认证状态已模拟为 unverified',
+      // 发布
+      sellItem: '发布闲置',
+      productImages: '商品图片 (最多9张)',
+      addPhoto: '添加图片',
+      title: '标题',
+      titlePlaceholder: '如：Nike Dunk Low',
+      currency: '货币',
+      currencyMYR: '马币 (RM)',
+      currencyCNY: '人民币 (¥)',
+      category: '分类',
+      selectCategory: '选择分类',
+      descriptionLabel: '描述',
+      descPlaceholder: '描述一下你的宝贝...',
+      tags: 'Tags / 标签',
+      location: '交易地点',
+      locationPlaceholder: '如：South Link, UM Library',
+      contactMethods: '联系方式 (至少填一项)',
+      listItem: '发布商品',
+      tapToPickLocation: '点击地图选择位置',
+      tagNegotiable: '可小刀',
+      tagUrgent: '急出',
+      tagNew: '全新',
+      tagDelivery: '可邮寄',
+      maxImages: '最多只能上传9张图片',
+      titleRequired: '标题不能为空',
+      priceRequired: '价格不能为空',
+      categoryRequired: '请选择分类',
+      locationRequired: '请输入地点名称',
+      contactRequired: '必须填写至少一种联系方式！',
+      publishFailed: '发布失败，请重试',
+      // 商品详情
+      saved: '已收藏',
+      addToFavorites: '收藏',
+      wechatCopied: '微信号已复制',
+      viewItem: '查看商品',
+      // 个人中心
+      myInbox: '我的消息',
+      editProfile: '编辑资料',
+      myListings: '我发布的',
+      favorites: '收藏夹',
+      noListings: '暂无发布的商品',
+      noFavorites: '暂无收藏的商品',
+      confirmDelete: '确定下架该商品吗？',
+      confirmLogout: '确定要退出登录吗？',
+      username: '用户名',
+      schoolName: '学校名称',
+      saveChanges: '保存修改',
+      // 消息
+      noMessages: '暂无消息',
+      tapToChat: '点击开始聊天',
+      typeMessage: '输入消息...',
+      safetyTip: '交易前请先核实对方学生身份',
+      online: '在线',
+      // 编辑商品
+      editProduct: '编辑商品',
+      updateProduct: '更新商品',
+      editSuccess: '商品更新成功',
+      // 搜索
+      searchHistory: '最近搜索',
+      clearHistory: '清空',
+      hotTags: '热门标签',
     }
   }), [])
+
+  // 1. Auth & Initial Data Fetch
   useEffect(() => {
-    const raw = localStorage.getItem(STORAGE_KEY)
-    if (raw) {
-      try {
-        const parsed = JSON.parse(raw)
-        if (Array.isArray(parsed)) {
-          setListings(parsed)
-        } else {
-          setListings(Array.isArray(parsed?.listings) ? parsed.listings : defaultProducts)
-          setFavorites(Array.isArray(parsed?.favorites) ? parsed.favorites : [])
-          setLanguage(parsed?.language === 'en' ? 'en' : 'zh')
-          setUser(parsed?.user && typeof parsed.user === 'object' ? parsed.user : { name: 'Guest User', school: 'Universiti Malaya (UM)', verified: false, avatar: 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&q=80' })
-          setLocations(Array.isArray(parsed?.locations) ? parsed.locations : ['All Locations', 'Ryan & Miho', 'Pacific Tower', 'South Link', 'UM Library', 'Jaya One'])
-        }
-      } catch {
-        setListings(defaultProducts)
-        setFavorites([])
-        setLanguage('zh')
-        setUser({ name: 'Guest User', school: 'Universiti Malaya (UM)', verified: false, avatar: 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&q=80' })
-        setLocations(['All Locations', 'Ryan & Miho', 'Pacific Tower', 'South Link', 'UM Library', 'Jaya One'])
+    // Check active session
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setSession(session)
+      if (session?.user) {
+        fetchProfile(session.user.id)
+        fetchFavorites(session.user.id)
+        fetchConversations(session.user.id)
+        fetchProducts(session.user.id)
+      } else {
+        fetchProducts(null)
       }
-    } else {
-      setListings(defaultProducts)
-      setFavorites([])
-      setLanguage('zh')
-      setUser({ name: 'Guest User', school: 'Universiti Malaya (UM)', verified: false, avatar: 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&q=80' })
-      setLocations(['All Locations', 'Ryan & Miho', 'Pacific Tower', 'South Link', 'UM Library', 'Jaya One'])
-    }
+    })
+
+    // Listen for auth changes
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      setSession(session)
+      if (session?.user) {
+        fetchProfile(session.user.id)
+        fetchFavorites(session.user.id)
+        fetchConversations(session.user.id)
+        fetchProducts(session.user.id) // 重新 fetch 以更新 owner 标记
+      } else {
+        // Reset to Guest
+        setUser({
+          name: 'Guest User',
+          school: 'Universiti Malaya (UM)',
+          verified: false,
+          verificationStatus: 'unverified',
+          avatar: 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&q=80'
+        })
+        setFavorites([])
+        setConversations([])
+        fetchProducts(null) // 登出后重新 fetch，清除 owner 标记
+      }
+    })
+
+    return () => subscription.unsubscribe()
   }, [])
 
-  useEffect(() => {
-    const payload = { listings, favorites, language, user, locations }
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(payload))
-  }, [listings, favorites, language, user, locations])
+  const fetchProfile = async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', userId)
+        .single()
 
-  const addListing = ({ title, price, imageFile, imageDataUrl, description, whatsapp, wechat, instagram, locationName, lat, lng, category, tags = [] }) => {
-    const id = `${Date.now()}`
-    const imageUrl = imageDataUrl || (imageFile ? URL.createObjectURL(imageFile) : '')
-    const createdAt = Date.now()
-    const next = [{
-      id,
-      title,
-      price: Number(price),
-      imageUrl,
-      description: description || '',
-      createdAt,
-      contact: whatsapp || '',
-      whatsapp: whatsapp || '',
-      wechat: wechat || '',
-      instagram: instagram || '',
-      locationName: locationName || '',
-      lat: typeof lat === 'number' ? lat : undefined,
-      lng: typeof lng === 'number' ? lng : undefined,
-      category,
-      tags,
-      owner: 'me'
-    }, ...listings]
-    setListings(next)
-    return id
+      if (data) {
+        setUser({
+          id: data.id,
+          name: data.full_name || data.email?.split('@')[0] || 'User',
+          school: data.school || 'Universiti Malaya (UM)',
+          verified: data.verification_status === 'verified',
+          verificationStatus: data.verification_status || 'unverified',
+          avatar: data.avatar_url || 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&q=80',
+          email: data.email
+        })
+      } else if (error && (error.code === 'PGRST116' || error.details?.includes('0 rows'))) {
+        // Profile doesn't exist, create it
+        console.log('Profile missing, creating new profile for:', userId)
+        const { data: newProfile, error: insertError } = await supabase
+          .from('profiles')
+          .insert({
+            id: userId,
+            email: session?.user?.email,
+            full_name: session?.user?.email?.split('@')[0] || 'User',
+            school: 'Universiti Malaya (UM)',
+            verification_status: 'unverified'
+          })
+          .select()
+          .single()
+
+        if (insertError) {
+          console.error('Error creating profile:', insertError)
+        } else if (newProfile) {
+          setUser({
+            id: newProfile.id,
+            name: newProfile.full_name,
+            school: newProfile.school,
+            verified: false,
+            verificationStatus: 'unverified',
+            avatar: newProfile.avatar_url || 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&q=80',
+            email: newProfile.email
+          })
+        }
+      }
+    } catch (err) {
+      console.error('Error fetching/creating profile:', err)
+
+      // Try to recover verification status from local fallback if Supabase fails
+      try {
+        const fallback = localStorage.getItem(`verification_fallback_${userId}`)
+        if (fallback) {
+          const { status } = JSON.parse(fallback)
+          console.log('Recovered verification status from fallback:', status)
+          setUser(prev => ({
+            ...prev,
+            verificationStatus: status,
+            verified: status === 'verified'
+          }))
+        }
+      } catch (e) {
+        console.error('Error reading verification fallback:', e)
+      }
+    }
   }
 
-  const deleteListing = (id) => {
-    setListings(listings.filter(l => l.id !== id))
-    setFavorites(favorites.filter(fid => fid !== id))
+  const fetchProducts = async (currentUserId = null) => {
+    setLoading(prev => ({ ...prev, products: true }))
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('*')
+        .order('created_at', { ascending: false })
+
+      if (error) throw error
+
+      // Map DB snake_case to app camelCase
+      const mapped = data.map(p => ({
+        id: p.id,
+        title: p.title,
+        price: p.price,
+        imageUrl: p.images?.[0] || '',
+        imageUrls: p.images || [],
+        description: p.description,
+        createdAt: new Date(p.created_at).getTime(),
+        contact: p.contact_info?.whatsapp || '',
+        whatsapp: p.contact_info?.whatsapp || '',
+        wechat: p.contact_info?.wechat || '',
+        instagram: p.contact_info?.instagram || '',
+        locationName: p.location_name,
+        lat: p.lat,
+        lng: p.lng,
+        category: p.category,
+        tags: p.tags || [],
+        currency: p.currency || 'MYR',
+        owner: currentUserId && currentUserId === p.owner_id ? 'me' : 'others',
+        owner_id: p.owner_id
+      }))
+      setListings(mapped)
+    } catch (err) {
+      console.error('Error fetching products:', err)
+    } finally {
+      setLoading(prev => ({ ...prev, products: false }))
+    }
   }
 
-  const deleteProduct = (id) => {
-    setListings(prev => prev.filter(item => item.id !== id))
+  const fetchFavorites = async (userId) => {
+    try {
+      const { data, error } = await supabase
+        .from('favorites')
+        .select('product_id')
+        .eq('user_id', userId)
+
+      if (data) {
+        setFavorites(data.map(f => f.product_id))
+      }
+    } catch (err) {
+      console.error('Error fetching favorites:', err)
+    }
   }
 
-  const toggleFavorite = (id) => {
-    setFavorites(prev => (prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]))
+  const fetchConversations = async (userId) => {
+    // This is a simplified fetch. In a real app, you might join with profiles/products.
+    // For now, we assume 'conversations' table has cached info or we fetch it.
+    try {
+      const { data, error } = await supabase
+        .from('conversations')
+        .select(`
+          *,
+          messages:messages(
+            id,
+            content,
+            sender_id,
+            created_at
+          )
+        `)
+        .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
+        .order('updated_at', { ascending: false })
+
+      if (data) {
+        const mapped = data.map(c => {
+          const isBuyer = c.buyer_id === userId
+          const otherName = isBuyer ? c.seller_name : c.buyer_name // Assuming these fields exist for simplicity
+
+          return {
+            id: c.id,
+            productId: c.product_id,
+            productTitle: c.product_title,
+            productImage: c.product_image,
+            sellerName: otherName || 'User', // Display name of the other party
+            messages: c.messages.map(m => ({
+              id: m.id,
+              text: m.content,
+              sender: m.sender_id === userId ? 'me' : 'other',
+              timestamp: new Date(m.created_at).getTime()
+            })).sort((a, b) => a.timestamp - b.timestamp),
+            lastMessage: c.last_message,
+            lastTimestamp: new Date(c.updated_at).getTime()
+          }
+        })
+        setConversations(mapped)
+      }
+    } catch (err) {
+      console.error('Error fetching conversations:', err)
+    }
+  }
+
+  const addListing = async ({ title, price, images, description, whatsapp, wechat, instagram, locationName, lat, lng, category, tags = [], currency = 'MYR' }) => {
+    if (!session?.user) {
+      showToast('error', language === 'zh' ? '请先登录' : 'Please login first')
+      return null
+    }
+
+    try {
+      console.log('Starting upload for:', title)
+
+      // 1. Upload Images
+      const uploadedUrls = []
+      for (const file of images) {
+        const fileExt = file.name.split('.').pop()
+        const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`
+
+        console.log('Uploading file:', fileName)
+        const { error: uploadError } = await supabase.storage
+          .from('product-images')
+          .upload(fileName, file)
+
+        if (uploadError) {
+          console.error('Supabase Storage Upload Error:', uploadError)
+          showToast('error', language === 'zh' ? `图片上传失败: ${uploadError.message}` : `Image upload failed: ${uploadError.message}`)
+          throw uploadError
+        }
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('product-images')
+          .getPublicUrl(fileName)
+
+        uploadedUrls.push(publicUrl)
+      }
+
+      // 2. Insert into DB
+      const locationPoint = (lat && lng) ? `POINT(${lng} ${lat})` : null
+      const payload = {
+        title,
+        price: Number(price),
+        currency, // Added currency
+        description,
+        images: uploadedUrls,
+        category,
+        tags,
+        location_name: locationName,
+        location: locationPoint,
+        lat,
+        lng,
+        owner_id: session.user.id,
+        contact_info: { whatsapp, wechat, instagram }
+      }
+
+      console.log('Inserting product to DB:', payload)
+      const { data, error } = await supabase
+        .from('products')
+        .insert(payload)
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Supabase DB Insert Error:', error)
+        showToast('error', language === 'zh' ? `发布失败: ${error.message}` : `Product publish failed: ${error.message}`)
+        throw error
+      }
+
+      console.log('Product published successfully:', data)
+      // Refresh listings
+      fetchProducts(session.user.id)
+      return data.id
+
+    } catch (err) {
+      console.error('Error adding listing (catch block):', err)
+      if (!err.message) {
+        showToast('error', language === 'zh' ? '发布失败，请重试' : 'Failed to publish. Please try again.')
+      }
+      return null
+    }
+  }
+
+  const deleteListing = async (id) => {
+    try {
+      const { error } = await supabase.from('products').delete().eq('id', id)
+      if (error) throw error
+      setListings(prev => prev.filter(l => l.id !== id))
+      showToast('success', language === 'zh' ? '商品已删除' : 'Item deleted')
+    } catch (err) {
+      console.error('Error deleting:', err)
+      showToast('error', language === 'zh' ? '删除失败' : 'Failed to delete')
+    }
+  }
+
+  const deleteProduct = (id) => deleteListing(id) // Alias
+
+  const toggleFavorite = async (productId) => {
+    if (!session?.user) {
+      showToast('warning', language === 'zh' ? '请先登录' : 'Please login first')
+      return
+    }
+
+    const isFav = favorites.includes(productId)
+    try {
+      if (isFav) {
+        await supabase.from('favorites').delete().match({ user_id: session.user.id, product_id: productId })
+        setFavorites(prev => prev.filter(id => id !== productId))
+      } else {
+        await supabase.from('favorites').insert({ user_id: session.user.id, product_id: productId })
+        setFavorites(prev => [...prev, productId])
+      }
+    } catch (err) {
+      console.error('Error toggling favorite:', err)
+    }
   }
 
   const toggleLanguage = () => {
     setLanguage(prev => (prev === 'zh' ? 'en' : 'zh'))
   }
 
-  const verifyStudent = () => {
-    setUser(prev => ({ ...prev, verified: true }))
+  const updateVerificationStatus = async (status) => {
+    if (!session?.user) return
+    console.log('Status Updating (Optimistic)', status)
+
+    // 1. Immediate Local Update (UI First)
+    setUser(prev => ({
+      ...prev,
+      verificationStatus: status,
+      verified: status === 'verified'
+    }))
+
+    // 2. Immediate Local Persistence
+    try {
+      localStorage.setItem(`verification_fallback_${session.user.id}`, JSON.stringify({
+        status,
+        timestamp: Date.now()
+      }))
+    } catch (e) {
+      console.error('LocalStorage persistence failed:', e)
+    }
+
+    // 3. Background Sync (Fire-and-forget)
+    (async () => {
+      console.log('Background Syncing with Supabase...')
+      try {
+        // Ensure Profile Exists
+        const { error: upsertError } = await supabase.from('profiles').upsert({
+          id: session.user.id,
+          email: session.user.email,
+          updated_at: new Date().toISOString()
+        }, { onConflict: 'id', ignoreDuplicates: true })
+
+        if (upsertError) console.warn('Background Upsert Warning:', upsertError)
+
+        // Update Status
+        const { data, error } = await supabase
+          .from('profiles')
+          .update({ verification_status: status })
+          .eq('id', session.user.id)
+          .select()
+          .single()
+
+        if (error) throw error
+
+        console.log('Background Sync Success:', data)
+        localStorage.removeItem(`verification_fallback_${session.user.id}`)
+      } catch (err) {
+        console.warn('Background Sync Failed:', err)
+        // We do NOT revert UI here to avoid flickering. 
+        // The fallback is already saved in localStorage for next load.
+      }
+    })()
+
+    // 4. Return immediately
+    return true
   }
 
-  const logoutUser = () => {
-    setUser({ name: 'Guest User', school: 'Universiti Malaya (UM)', verified: false, avatar: 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&q=80' })
+  // 发送 edu.my 邮箱验证码（使用 Supabase OTP）
+  const sendVerificationEmail = async (email) => {
+    if (!email.toLowerCase().endsWith('.edu.my')) {
+      throw new Error('Invalid email domain')
+    }
+    const { error } = await supabase.auth.signInWithOtp({
+      email,
+      options: { shouldCreateUser: false }
+    })
+    if (error) throw error
+    // 同时记录认证邮箱到 profile
+    if (session?.user) {
+      await supabase.from('profiles')
+        .update({ verification_email: email })
+        .eq('id', session.user.id)
+    }
+    return true
   }
 
-  const setUserAvatar = (avatar) => {
-    setUser(prev => ({ ...prev, avatar }))
+  // 上传认证证件到 Storage
+  const uploadVerificationDoc = async (file) => {
+    if (!session?.user) throw new Error('Not logged in')
+    const fileExt = file.name.split('.').pop()
+    const fileName = `verify_${session.user.id}_${Date.now()}.${fileExt}`
+
+    const { error: uploadError } = await supabase.storage
+      .from('verification-docs')
+      .upload(fileName, file)
+
+    if (uploadError) throw uploadError
+
+    // 记录文件路径到 profile（Private bucket 不生成 publicUrl）
+    await supabase.from('profiles')
+      .update({
+        verification_doc_url: fileName,
+        verification_status: 'pending'
+      })
+      .eq('id', session.user.id)
+
+    setUser(prev => ({ ...prev, verificationStatus: 'pending' }))
+    return true
   }
-  const setUserSchool = (school) => {
-    setUser(prev => ({ ...prev, school }))
+
+  // 更新商品
+  const updateListing = async (id, { title, price, description, whatsapp, wechat, instagram, locationName, lat, lng, category, tags = [], currency = 'MYR' }) => {
+    if (!session?.user) return null
+    try {
+      const payload = {
+        title,
+        price: Number(price),
+        currency,
+        description,
+        category,
+        tags,
+        location_name: locationName,
+        lat,
+        lng,
+        contact_info: { whatsapp, wechat, instagram },
+        updated_at: new Date().toISOString()
+      }
+
+      const { data, error } = await supabase
+        .from('products')
+        .update(payload)
+        .eq('id', id)
+        .eq('owner_id', session.user.id) // RLS 额外保障
+        .select()
+        .single()
+
+      if (error) throw error
+
+      // 刷新列表
+      fetchProducts(session.user.id)
+      return data.id
+    } catch (err) {
+      console.error('Error updating listing:', err)
+      return null
+    }
   }
-  const updateUser = ({ name, school }) => {
-    setUser(prev => ({ ...prev, name, school }))
+
+  // 标记会话已读
+  const markConversationRead = async (conversationId) => {
+    if (!session?.user) return
+    try {
+      // 判断当前用户是买家还是卖家
+      const conv = conversations.find(c => c.id === conversationId)
+      if (!conv) return
+
+      const { data: convData } = await supabase
+        .from('conversations')
+        .select('buyer_id, seller_id')
+        .eq('id', conversationId)
+        .single()
+
+      if (!convData) return
+
+      const isBuyer = convData.buyer_id === session.user.id
+      const field = isBuyer ? 'buyer_last_read_at' : 'seller_last_read_at'
+
+      await supabase
+        .from('conversations')
+        .update({ [field]: new Date().toISOString() })
+        .eq('id', conversationId)
+    } catch (err) {
+      console.error('Error marking conversation read:', err)
+    }
   }
+
+  const logoutUser = async () => {
+    await supabase.auth.signOut()
+    // State clearing is handled by onAuthStateChange
+  }
+
+  // setUserAvatar 已移除，头像上传统一使用 uploadAvatar(file)
+
+  // Helper to upload avatar file directly (called from Profile.jsx ideally)
+  const uploadAvatar = async (file) => {
+    if (!session?.user) return
+    const fileExt = file.name.split('.').pop()
+    const fileName = `avatar_${session.user.id}_${Date.now()}.${fileExt}`
+    const { error } = await supabase.storage.from('avatars').upload(fileName, file, { upsert: true })
+    if (error) {
+      console.error('Avatar upload error:', error)
+      showToast('error', language === 'zh' ? '头像上传失败' : 'Avatar upload failed')
+      return
+    }
+    const { data: { publicUrl } } = supabase.storage.from('avatars').getPublicUrl(fileName)
+    await supabase.from('profiles').update({ avatar_url: publicUrl }).eq('id', session.user.id)
+    setUser(prev => ({ ...prev, avatar: publicUrl }))
+    showToast('success', language === 'zh' ? '头像已更新' : 'Avatar updated')
+  }
+
+  const updateUser = async ({ name, school }) => {
+    if (!session?.user) return
+    try {
+      await supabase
+        .from('profiles')
+        .update({ full_name: name, school })
+        .eq('id', session.user.id)
+      setUser(prev => ({ ...prev, name, school }))
+    } catch (err) {
+      console.error('Update user error:', err)
+    }
+  }
+
   const addLocation = (newLoc) => {
+    // Local only for now, or could be a 'locations' table
     const name = (newLoc || '').trim()
     if (!name) return
     const exists = locations.some(loc => normalize(loc) === normalize(name))
@@ -224,27 +837,178 @@ export const MarketplaceProvider = ({ children }) => {
     }
   }
 
+  // 3.6 举报功能
+  const reportContent = async (type, targetId, reason, details = '') => {
+    if (!session?.user) {
+      showToast('error', language === 'zh' ? '请先登录' : 'Please login first')
+      return
+    }
+    const { error } = await supabase.from('reports').insert({
+      reporter_id: session.user.id,
+      report_type: type,
+      target_id: targetId,
+      reason,
+      details
+    })
+    if (error) throw error
+  }
+
+  const sendMessage = async (conversationId, text) => {
+    if (!session?.user) return
+    try {
+      // Ensure conversation exists (optional check, but good for safety)
+      // Since conversationId is passed, it likely exists, but let's log.
+      console.log('Sending message to conversation:', conversationId)
+
+      const { data, error } = await supabase
+        .from('messages')
+        .insert({
+          conversation_id: conversationId,
+          sender_id: session.user.id,
+          content: text
+        })
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Error sending message:', error)
+        throw error
+      }
+
+      // Update conversation updated_at and last_message
+      const { error: updateError } = await supabase
+        .from('conversations')
+        .update({
+          updated_at: new Date().toISOString(),
+          last_message: text
+        })
+        .eq('id', conversationId)
+
+      if (updateError) console.error('Error updating conversation timestamp:', updateError)
+
+      // Optimistic update
+      setConversations(prev => prev.map(conv => {
+        if (conv.id === conversationId) {
+          return {
+            ...conv,
+            messages: [...conv.messages, {
+              id: data?.id || Date.now(),
+              text,
+              sender: 'me',
+              timestamp: Date.now()
+            }],
+            lastMessage: text,
+            lastTimestamp: Date.now()
+          }
+        }
+        return conv
+      }))
+    } catch (err) {
+      console.error('Error sending message (catch):', err)
+      showToast('error', language === 'zh' ? '消息发送失败' : 'Failed to send message')
+    }
+  }
+
+  const startConversation = async (product) => {
+    if (!session?.user) return
+
+    // 1. Check local state
+    const existing = conversations.find(c => c.productId === product.id)
+    if (existing) return existing.id
+
+    try {
+      // 2. Check DB to be safe (avoid duplicates)
+      const { data: existingRemote } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('product_id', product.id)
+        .eq('buyer_id', session.user.id)
+        .maybeSingle()
+
+      if (existingRemote) {
+        console.log('Found existing conversation in DB:', existingRemote.id)
+        return existingRemote.id
+      }
+
+      // 3. Create new conversation
+      const { data, error } = await supabase
+        .from('conversations')
+        .insert({
+          product_id: product.id,
+          buyer_id: session.user.id,
+          seller_id: product.owner_id,
+          product_title: product.title,
+          product_image: product.imageUrl,
+          seller_name: product.owner === 'others' ? 'Seller' : 'Buyer',
+          buyer_name: user.name
+        })
+        .select()
+        .single()
+
+      if (error) {
+        console.error('Error creating conversation:', error)
+        throw error
+      }
+
+      if (data) {
+        const newConv = {
+          id: data.id,
+          productId: product.id,
+          productTitle: product.title,
+          productImage: product.imageUrl,
+          sellerName: 'Seller',
+          messages: [],
+          lastMessage: '',
+          lastTimestamp: Date.now()
+        }
+        setConversations(prev => [newConv, ...prev])
+        return data.id
+      }
+    } catch (err) {
+      console.error('Error starting conversation:', err)
+    }
+    return null
+  }
+
   const value = useMemo(() => ({
     listings,
     favorites,
     addListing,
+    updateListing,
     deleteListing,
     toggleFavorite,
     language,
     translations,
     categories: CATEGORY_DEF,
     user,
+    session,
     toggleLanguage,
-    verifyStudent,
+    updateVerificationStatus,
+    sendVerificationEmail,
+    uploadVerificationDoc,
     logoutUser,
-    setUserAvatar,
-    setUserSchool,
+    uploadAvatar,
     updateUser,
-    locations,
+    locations: uniqueLocations,
     addLocation,
     normalize,
-    deleteProduct
-  }), [listings, favorites, language, user, locations, normalize])
+    deleteProduct,
+    conversations,
+    sendMessage,
+    startConversation,
+    markConversationRead,
+    fetchConversations,
+    userLocation,
+    setUserLocation,
+    // 3.1 Loading
+    loading,
+    // 3.2 Toast
+    toast,
+    showToast,
+    clearToast,
+    // 3.6 Report
+    reportContent
+  }), [listings, favorites, language, user, session, locations, normalize, conversations, userLocation, loading, toast])
   return <MarketplaceContext.Provider value={value}>{children}</MarketplaceContext.Provider>
 }
 
