@@ -19,9 +19,9 @@ const BottomNav = () => {
   if (shouldHide) return null
 
   return (
-    <div className="fixed bottom-6 left-6 right-6 z-50 pointer-events-none pb-4">
-      {/* Floating White Capsule */}
-      <div className="mx-auto max-w-[360px] bg-white/95 backdrop-blur-md rounded-[3rem] px-4 h-[72px] flex items-center justify-between shadow-[0_20px_40px_rgba(0,0,0,0.08)] pointer-events-auto border border-white/60">
+    <div className="fixed md:bottom-6 bottom-0 left-0 right-0 md:left-6 md:right-6 z-[60] pointer-events-none md:pb-4 pb-0">
+      {/* Floating White Capsule (Desktop) / Full-width Flat Bar (Mobile) */}
+      <div className="mx-auto max-w-[420px] bg-white/95 backdrop-blur-md md:rounded-[3rem] rounded-t-3xl md:px-4 px-2 h-[72px] pb-[env(safe-area-inset-bottom)] flex items-center justify-between md:shadow-[0_20px_40px_rgba(0,0,0,0.08)] shadow-[0_-10px_40px_rgba(0,0,0,0.05)] pointer-events-auto border border-white/60">
 
         {/* Home */}
         <NavLink to="/home" className="relative flex flex-col items-center flex-1 h-full justify-center group">

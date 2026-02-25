@@ -119,7 +119,7 @@ const ChatRoom = () => {
       </div>
 
       {/* Input */}
-      <form onSubmit={handleSend} className="bg-white border-t p-4 flex gap-2 shrink-0">
+      <form onSubmit={handleSend} className="bg-white border-t p-4 flex gap-2 shrink-0 pb-safe pb-8">
         <input
           type="text"
           value={inputText}

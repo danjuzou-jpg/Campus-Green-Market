@@ -373,7 +373,7 @@ export const MarketplaceProvider = ({ children }) => {
             id: userId,
             email: session?.user?.email,
             full_name: session?.user?.email?.split('@')[0] || 'User',
-            school: 'Universiti Malaya (UM)',
+            school: session?.user?.email?.toLowerCase().endsWith('.edu.my') ? 'Universiti Malaya (UM)' : 'Unknown University',
             verification_status: 'unverified'
           })
           .select()
@@ -795,6 +795,7 @@ export const MarketplaceProvider = ({ children }) => {
       console.error('Error marking conversation read:', err)
     }
   }
+
 
   const logoutUser = async () => {
     await supabase.auth.signOut()
