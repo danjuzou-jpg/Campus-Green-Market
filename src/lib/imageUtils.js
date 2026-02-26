@@ -50,10 +50,6 @@ export const compressImage = (file, maxWidth = 1200, quality = 0.8) => {
                             lastModified: Date.now()
                         })
 
-                        console.log(
-                            `Image compressed: ${(file.size / 1024).toFixed(0)}KB → ${(compressedFile.size / 1024).toFixed(0)}KB (${Math.round((1 - compressedFile.size / file.size) * 100)}% reduction)`
-                        )
-
                         resolve(compressedFile)
                     },
                     'image/jpeg',

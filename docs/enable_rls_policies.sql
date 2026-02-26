@@ -103,5 +103,30 @@ CREATE POLICY "Users can delete own favorites"
   USING (auth.uid() = user_id);
 
 -- ================================================================
+
+-- 5. products 表 — 所有人可浏览，只有发布者可修改/删除
+ALTER TABLE products ENABLE ROW LEVEL SECURITY;
+
+-- 查看：所有人可浏览（含未登录游客）
+CREATE POLICY "Anyone can view products"
+  ON products FOR SELECT
+  USING (true);
+
+-- 创建：只能以自己为发布者创建
+CREATE POLICY "Users can insert own products"
+  ON products FOR INSERT
+  WITH CHECK (auth.uid() = owner_id);
+
+-- 修改：只能修改自己的商品
+CREATE POLICY "Users can update own products"
+  ON products FOR UPDATE
+  USING (auth.uid() = owner_id);
+
+-- 删除：只能删除自己的商品
+CREATE POLICY "Users can delete own products"
+  ON products FOR DELETE
+  USING (auth.uid() = owner_id);
+
+-- ================================================================
 -- Done! Your database is now protected by Row Level Security.
 -- ================================================================

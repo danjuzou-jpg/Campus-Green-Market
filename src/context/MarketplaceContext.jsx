@@ -369,7 +369,6 @@ export const MarketplaceProvider = ({ children }) => {
         })
       } else if (error && (error.code === 'PGRST116' || error.details?.includes('0 rows'))) {
         // Profile doesn't exist, create it
-        console.log('Profile missing, creating new profile for:', userId)
         const { data: newProfile, error: insertError } = await supabase
           .from('profiles')
           .insert({
@@ -404,7 +403,6 @@ export const MarketplaceProvider = ({ children }) => {
         const fallback = localStorage.getItem(`verification_fallback_${userId}`)
         if (fallback) {
           const { status } = JSON.parse(fallback)
-          console.log('Recovered verification status from fallback:', status)
           setUser(prev => ({
             ...prev,
             verificationStatus: status,
@@ -526,28 +524,25 @@ export const MarketplaceProvider = ({ children }) => {
     }
   }, [])
 
-  const addListing = async ({ title, price, images, description, whatsapp, wechat, instagram, locationName, lat, lng, category, tags = [], currency = 'MYR' }) => {
+  const addListing = useCallback(async ({ title, price, images, description, whatsapp, wechat, instagram, locationName, lat, lng, category, tags = [], currency = 'MYR' }) => {
     if (!session?.user) {
       showToast('error', language === 'zh' ? '请先登录' : 'Please login first')
       return null
     }
 
     try {
-      console.log('Starting upload for:', title)
-
       // 1. Upload Images
       const uploadedUrls = []
       for (const file of images) {
         const fileExt = file.name.split('.').pop()
         const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`
 
-        console.log('Uploading file:', fileName)
         const { error: uploadError } = await supabase.storage
           .from('product-images')
           .upload(fileName, file)
 
         if (uploadError) {
-          console.error('Supabase Storage Upload Error:', uploadError)
+          console.error('Storage upload error:', uploadError)
           showToast('error', language === 'zh' ? `图片上传失败: ${uploadError.message}` : `Image upload failed: ${uploadError.message}`)
           throw uploadError
         }
@@ -564,7 +559,7 @@ export const MarketplaceProvider = ({ children }) => {
       const payload = {
         title,
         price: Number(price),
-        currency, // Added currency
+        currency,
         description,
         images: uploadedUrls,
         category,
@@ -577,7 +572,6 @@ export const MarketplaceProvider = ({ children }) => {
         contact_info: { whatsapp, wechat, instagram }
       }
 
-      console.log('Inserting product to DB:', payload)
       const { data, error } = await supabase
         .from('products')
         .insert(payload)
@@ -585,26 +579,25 @@ export const MarketplaceProvider = ({ children }) => {
         .single()
 
       if (error) {
-        console.error('Supabase DB Insert Error:', error)
+        console.error('DB insert error:', error)
         showToast('error', language === 'zh' ? `发布失败: ${error.message}` : `Product publish failed: ${error.message}`)
         throw error
       }
 
-      console.log('Product published successfully:', data)
       // Refresh listings
       fetchProducts(session.user.id)
       return data.id
 
     } catch (err) {
-      console.error('Error adding listing (catch block):', err)
+      console.error('Error adding listing:', err)
       if (!err.message) {
         showToast('error', language === 'zh' ? '发布失败，请重试' : 'Failed to publish. Please try again.')
       }
       return null
     }
-  }
+  }, [session, language, showToast])
 
-  const deleteListing = async (id) => {
+  const deleteListing = useCallback(async (id) => {
     try {
       const { error } = await supabase.from('products').delete().eq('id', id)
       if (error) throw error
@@ -614,11 +607,11 @@ export const MarketplaceProvider = ({ children }) => {
       console.error('Error deleting:', err)
       showToast('error', language === 'zh' ? '删除失败' : 'Failed to delete')
     }
-  }
+  }, [language, showToast])
 
-  const deleteProduct = (id) => deleteListing(id) // Alias
+  const deleteProduct = useCallback((id) => deleteListing(id), [deleteListing])
 
-  const toggleFavorite = async (productId) => {
+  const toggleFavorite = useCallback(async (productId) => {
     if (!session?.user) {
       showToast('warning', language === 'zh' ? '请先登录' : 'Please login first')
       return
@@ -636,15 +629,14 @@ export const MarketplaceProvider = ({ children }) => {
     } catch (err) {
       console.error('Error toggling favorite:', err)
     }
-  }
+  }, [session, favorites, language, showToast])
 
-  const toggleLanguage = () => {
+  const toggleLanguage = useCallback(() => {
     setLanguage(prev => (prev === 'zh' ? 'en' : 'zh'))
-  }
+  }, [])
 
-  const updateVerificationStatus = async (status) => {
+  const updateVerificationStatus = useCallback(async (status) => {
     if (!session?.user) return
-    console.log('Status Updating (Optimistic)', status)
 
     // 1. Immediate Local Update (UI First)
     setUser(prev => ({
@@ -665,7 +657,6 @@ export const MarketplaceProvider = ({ children }) => {
 
     // 3. Background Sync (Fire-and-forget)
     (async () => {
-      console.log('Background Syncing with Supabase...')
       try {
         // Ensure Profile Exists
         const { error: upsertError } = await supabase.from('profiles').upsert({
@@ -674,10 +665,10 @@ export const MarketplaceProvider = ({ children }) => {
           updated_at: new Date().toISOString()
         }, { onConflict: 'id', ignoreDuplicates: true })
 
-        if (upsertError) console.warn('Background Upsert Warning:', upsertError)
+        if (upsertError) console.warn('Background upsert warning:', upsertError)
 
         // Update Status
-        const { data, error } = await supabase
+        const { error } = await supabase
           .from('profiles')
           .update({ verification_status: status })
           .eq('id', session.user.id)
@@ -686,18 +677,14 @@ export const MarketplaceProvider = ({ children }) => {
 
         if (error) throw error
 
-        console.log('Background Sync Success:', data)
         localStorage.removeItem(`verification_fallback_${session.user.id}`)
       } catch (err) {
-        console.warn('Background Sync Failed:', err)
-        // We do NOT revert UI here to avoid flickering. 
-        // The fallback is already saved in localStorage for next load.
+        console.warn('Background sync failed:', err)
       }
     })()
 
-    // 4. Return immediately
     return true
-  }
+  }, [session])
 
   // 发送 edu.my 邮箱验证码（使用 Supabase OTP）
   const sendVerificationEmail = async (email) => {
@@ -897,13 +884,9 @@ export const MarketplaceProvider = ({ children }) => {
     }
   }, [session, language, showToast])
 
-  const sendMessage = async (conversationId, text) => {
+  const sendMessage = useCallback(async (conversationId, text) => {
     if (!session?.user) return
     try {
-      // Ensure conversation exists (optional check, but good for safety)
-      // Since conversationId is passed, it likely exists, but let's log.
-      console.log('Sending message to conversation:', conversationId)
-
       const { data, error } = await supabase
         .from('messages')
         .insert({
@@ -948,12 +931,12 @@ export const MarketplaceProvider = ({ children }) => {
         return conv
       }))
     } catch (err) {
-      console.error('Error sending message (catch):', err)
+      console.error('Error sending message:', err)
       showToast('error', language === 'zh' ? '消息发送失败' : 'Failed to send message')
     }
-  }
+  }, [session, language, showToast])
 
-  const startConversation = async (product) => {
+  const startConversation = useCallback(async (product) => {
     if (!session?.user) return
 
     // 1. Check local state
@@ -970,7 +953,6 @@ export const MarketplaceProvider = ({ children }) => {
         .maybeSingle()
 
       if (existingRemote) {
-        console.log('Found existing conversation in DB:', existingRemote.id)
         return existingRemote.id
       }
 
@@ -1012,7 +994,7 @@ export const MarketplaceProvider = ({ children }) => {
       console.error('Error starting conversation:', err)
     }
     return null
-  }
+  }, [session, conversations, user.name])
 
   const unreadCount = useMemo(() => {
     return conversations.reduce((total, conv) => total + (conv.unreadCount || 0), 0)
