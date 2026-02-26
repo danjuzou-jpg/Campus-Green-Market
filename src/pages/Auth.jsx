@@ -292,20 +292,24 @@ const Auth = () => {
                         </button>
                     )}
 
-                    {/* Divider */}
-                    <div className="flex items-center gap-4 my-4">
-                        <div className="flex-1 h-px bg-gray-200" />
-                        <span className="text-xs text-gray-400 font-medium">{text.orContinueWith}</span>
-                        <div className="flex-1 h-px bg-gray-200" />
-                    </div>
+                    {(mode === 'login' || mode === 'register') && (
+                        <>
+                            {/* Divider */}
+                            <div className="flex items-center gap-4 my-4">
+                                <div className="flex-1 h-px bg-gray-200" />
+                                <span className="text-xs text-gray-400 font-medium">{text.orContinueWith}</span>
+                                <div className="flex-1 h-px bg-gray-200" />
+                            </div>
 
-                    {/* Guest Mode */}
-                    <button
-                        onClick={handleGuestBrowse}
-                        className="w-full border-2 border-gray-200 text-gray-600 font-bold py-3 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all text-sm"
-                    >
-                        {text.guestMode}
-                    </button>
+                            {/* Guest Mode */}
+                            <button
+                                onClick={handleGuestBrowse}
+                                className="w-full border-2 border-gray-200 text-gray-600 font-bold py-3 rounded-xl hover:bg-gray-50 hover:border-gray-300 transition-all text-sm"
+                            >
+                                {text.guestMode}
+                            </button>
+                        </>
+                    )}
                 </div>
             </div>
 

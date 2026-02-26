@@ -1,5 +1,5 @@
 import React from 'react'
-import { Outlet, Link } from 'react-router-dom'
+import { Outlet, Link, useNavigate } from 'react-router-dom'
 import BottomNav from './BottomNav.jsx'
 import Logo from './Logo'
 import { Languages } from 'lucide-react'
@@ -8,6 +8,7 @@ import Toast from './Toast.jsx'
 import { Search } from 'lucide-react'
 
 const Layout = () => {
+  const navigate = useNavigate()
   const { language, toggleLanguage, toast, clearToast, user, unreadCount } = useMarketplace()
   const label = language === 'zh' ? '🌐 中文 / EN' : '🌐 EN / 中文'
   return (
@@ -31,7 +32,11 @@ const Layout = () => {
                 {label}
               </button>
 
-              <button className="w-10 h-10 rounded-full bg-white/80 backdrop-blur-md text-slate-500 shadow-sm border border-white/50 flex items-center justify-center relative hover:bg-white transition-colors">
+              <button
+                onClick={() => navigate('/inbox')}
+                className="w-10 h-10 rounded-full bg-white/80 backdrop-blur-md text-slate-500 shadow-sm border border-white/50 flex items-center justify-center relative hover:bg-white hover:text-teal-600 transition-colors"
+                title={language === 'zh' ? "消息" : "Inbox"}
+              >
                 <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round"><path d="M6 8a6 6 0 0 1 12 0c0 7 3 9 3 9H3s3-2 3-9" /><path d="M10.3 21a1.94 1.94 0 0 0 3.4 0" /></svg>
                 {/* Notification indicator */}
                 {unreadCount > 0 && (
