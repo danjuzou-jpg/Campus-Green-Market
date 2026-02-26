@@ -33,7 +33,7 @@ const Home = () => {
   const [appliedTerm, setAppliedTerm] = useState('')
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
-  const { fetchProducts } = useMarketplace()
+  const { fetchProducts, session } = useMarketplace()
 
   // 搜索历史
   const [searchHistory, setSearchHistory] = useState(() => {
