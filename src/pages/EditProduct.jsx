@@ -2,18 +2,22 @@ import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import { useMarketplace } from '../context/MarketplaceContext.jsx'
 import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
-import { ArrowLeft } from 'lucide-react'
+import { ArrowLeft, X, Plus } from 'lucide-react'
 import { LoadingButton } from '../components/LoadingSpinner.jsx'
+import { compressImages } from '../lib/imageUtils.js'
 
 const EditProduct = () => {
     const { id } = useParams()
     const navigate = useNavigate()
-    const { listings, updateListing, categories, language, translations, locations, normalize, session, showToast } = useMarketplace()
+    const { getProductById, updateListing, categories, language, translations, locations, normalize, session, showToast } = useMarketplace()
     const t = translations[language]
 
-    const item = listings.find(l => l.id === id)
-
+    const [item, setItem] = useState(null)
     const [title, setTitle] = useState('')
+
+    useEffect(() => {
+        getProductById(id, session?.user?.id).then(setItem)
+    }, [id, getProductById, session])
     const [price, setPrice] = useState('')
     const [currency, setCurrency] = useState('MYR')
     const [description, setDescription] = useState('')
@@ -25,6 +29,12 @@ const EditProduct = () => {
     const [locationName, setLocationName] = useState('')
     const [latlng, setLatlng] = useState({ lat: 3.119, lng: 101.654 })
     const [loading, setLoading] = useState(false)
+
+    // Image Management States
+    const [retainedImages, setRetainedImages] = useState([])
+    const [deletedImages, setDeletedImages] = useState([])
+    const [newImageFiles, setNewImageFiles] = useState([])
+    const [newImagePreviews, setNewImagePreviews] = useState([])
 
     const currencySymbols = { MYR: 'RM', CNY: '¥' }
 
@@ -40,6 +50,7 @@ const EditProduct = () => {
             setTagsInput((item.tags || []).join(' '))
             setLocationName(item.locationName || '')
             if (item.lat && item.lng) setLatlng({ lat: item.lat, lng: item.lng })
+            setRetainedImages(item.images || item.imageUrls || (item.imageUrl ? [item.imageUrl] : []))
         }
     }, [item])
 
@@ -64,9 +75,16 @@ const EditProduct = () => {
 
             const tags = tagsInput.split(' ').map(s => s.trim()).filter(Boolean)
 
+            if (retainedImages.length === 0 && newImageFiles.length === 0) {
+                showToast('warning', language === 'zh' ? '至少需要一张商品图片' : 'At least one image is required')
+                setLoading(false)
+                return
+            }
+
             const result = await updateListing(id, {
                 title, price, description, whatsapp, wechat, instagram,
-                locationName: finalLocationName, lat: latlng?.lat, lng: latlng?.lng, category, tags, currency
+                locationName: finalLocationName, lat: latlng?.lat, lng: latlng?.lng, category, tags, currency,
+                retainedImages, deletedImages, newImages: newImageFiles
             })
             if (result) {
                 showToast('success', t.editSuccess)
@@ -90,6 +108,31 @@ const EditProduct = () => {
         return null
     }
 
+    const handleRemoveRetained = (url) => {
+        setRetainedImages(prev => prev.filter(u => u !== url))
+        setDeletedImages(prev => [...prev, url])
+    }
+
+    const handleRemoveNew = (index) => {
+        setNewImageFiles(prev => prev.filter((_, i) => i !== index))
+        setNewImagePreviews(prev => prev.filter((_, i) => i !== index))
+    }
+
+    const handleFileSelect = async (e) => {
+        const files = Array.from(e.target.files)
+        if (!files.length) return
+        setLoading(true) // 压缩可能耗时
+        try {
+            const compressed = await compressImages(files)
+            setNewImageFiles(prev => [...prev, ...compressed])
+            const previews = compressed.map(f => URL.createObjectURL(f))
+            setNewImagePreviews(prev => [...prev, ...previews])
+        } finally {
+            setLoading(false)
+        }
+        e.target.value = '' // Reset input
+    }
+
     return (
         <div className="mx-auto max-w-2xl px-4 pt-6 pb-24">
             <div className="flex items-center gap-3 mb-6">
@@ -99,18 +142,41 @@ const EditProduct = () => {
                 <h1 className="text-2xl font-black text-gray-900">{t.editProduct}</h1>
             </div>
 
-            {/* Product images (read-only for now) */}
-            {(item.imageUrls || [item.imageUrl]).length > 0 && (
-                <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 mb-6">
-                    <div className="flex gap-3 overflow-x-auto">
-                        {(item.imageUrls || [item.imageUrl]).map((url, idx) => (
-                            <div key={idx} className="w-20 h-20 rounded-xl overflow-hidden border border-gray-100 shrink-0">
-                                <img src={url} alt="" className="w-full h-full object-cover" />
-                            </div>
-                        ))}
-                    </div>
+            <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 mb-6">
+                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide items-center">
+                    {/* Retained Old Images */}
+                    {retainedImages.map((url, idx) => (
+                        <div key={`old-${idx}`} className="w-20 h-20 rounded-xl overflow-hidden border border-gray-100 shrink-0 relative group">
+                            <img src={url} alt="" className="w-full h-full object-cover" />
+                            <button
+                                onClick={() => handleRemoveRetained(url)}
+                                className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                                <X size={12} />
+                            </button>
+                        </div>
+                    ))}
+                    {/* New Images Previews */}
+                    {newImagePreviews.map((url, idx) => (
+                        <div key={`new-${idx}`} className="w-20 h-20 rounded-xl overflow-hidden border border-emerald-200 shrink-0 relative group">
+                            <img src={url} alt="" className="w-full h-full object-cover" />
+                            <button
+                                onClick={() => handleRemoveNew(idx)}
+                                className="absolute top-1 right-1 bg-black/50 text-white rounded-full p-1 opacity-0 group-hover:opacity-100 transition-opacity"
+                            >
+                                <X size={12} />
+                            </button>
+                        </div>
+                    ))}
+                    {/* Add Image Button */}
+                    {retainedImages.length + newImageFiles.length < 5 && (
+                        <label className="w-20 h-20 rounded-xl border-2 border-dashed border-gray-300 flex items-center justify-center text-gray-400 shrink-0 cursor-pointer hover:bg-gray-50 transition-colors">
+                            <input type="file" multiple accept="image/*" className="hidden" onChange={handleFileSelect} disabled={loading} />
+                            <Plus size={24} />
+                        </label>
+                    )}
                 </div>
-            )}
+            </div>
 
             <form onSubmit={submit} className="space-y-4">
                 <div>

@@ -415,18 +415,17 @@ export const MarketplaceProvider = ({ children }) => {
     }
   }
 
-  const fetchProducts = async (currentUserId = null) => {
-    setLoading(prev => ({ ...prev, products: true }))
+  const getProductById = useCallback(async (id, currentUserId = null) => {
+    // 1. Try to find in current listings memory
+    const local = listings.find(l => l.id === id)
+    if (local) return local
+
+    // 2. Otherwise fetch from Supabase
     try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('*')
-        .order('created_at', { ascending: false })
+      const { data: p, error } = await supabase.from('products').select('*').eq('id', id).single()
+      if (error || !p) return null
 
-      if (error) throw error
-
-      // Map DB snake_case to app camelCase
-      const mapped = data.map(p => ({
+      return {
         id: p.id,
         title: p.title,
         price: p.price,
@@ -446,13 +445,95 @@ export const MarketplaceProvider = ({ children }) => {
         currency: p.currency || 'MYR',
         owner: currentUserId && currentUserId === p.owner_id ? 'me' : 'others',
         owner_id: p.owner_id
-      }))
-      setListings(mapped)
+      }
+    } catch (err) {
+      console.error('Error fetching product by id:', err)
+      return null
+    }
+  }, [listings])
+
+  const mapDBProduct = (p, currentUserId) => ({
+    id: p.id,
+    title: p.title,
+    price: p.price,
+    imageUrl: p.images?.[0] || '',
+    imageUrls: p.images || [],
+    description: p.description,
+    createdAt: new Date(p.created_at).getTime(),
+    contact: p.contact_info?.whatsapp || '',
+    whatsapp: p.contact_info?.whatsapp || '',
+    wechat: p.contact_info?.wechat || '',
+    instagram: p.contact_info?.instagram || '',
+    locationName: p.location_name,
+    lat: p.lat,
+    lng: p.lng,
+    category: p.category,
+    tags: p.tags || [],
+    currency: p.currency || 'MYR',
+    owner: currentUserId && currentUserId === p.owner_id ? 'me' : 'others',
+    owner_id: p.owner_id
+  })
+
+  // Home Page Paged Search
+  const fetchProducts = async (currentUserId = null, {
+    page = 1,
+    limit = 20,
+    searchTerm = '',
+    categoryFilter = 'All',
+    locationFilter = 'All Locations',
+    userLat = null,
+    userLng = null,
+    maxDistanceKm = null
+  } = {}) => {
+    setLoading(prev => ({ ...prev, products: true }))
+    try {
+      const { data, error } = await supabase.rpc('search_products', {
+        search_term: searchTerm,
+        category_filter: categoryFilter,
+        location_filter: locationFilter,
+        user_lat: userLat,
+        user_lng: userLng,
+        max_distance_km: maxDistanceKm === 'Any' ? null : (Number(maxDistanceKm) || null),
+        page_limit: limit,
+        page_offset: (page - 1) * limit
+      })
+
+      if (error) {
+        // Fallback to basic fetch if RPC is not created yet
+        console.warn('RPC failed, falling back to basic query', error)
+        let q = supabase.from('products').select('*').order('created_at', { ascending: false }).range((page - 1) * limit, page * limit - 1)
+        if (categoryFilter !== 'All') q = q.eq('category', categoryFilter)
+        if (searchTerm) q = q.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
+
+        const { data: fallbackData, error: fbError } = await q
+        if (fbError) throw fbError
+
+        const mapped = fallbackData.map(p => mapDBProduct(p, currentUserId))
+
+        setListings(prev => page === 1 ? mapped : [...prev, ...mapped.filter(n => !prev.some(o => o.id === n.id))])
+        return fallbackData.length >= limit
+      }
+
+      const mapped = data.map(p => mapDBProduct(p, currentUserId))
+      setListings(prev => page === 1 ? mapped : [...prev, ...mapped.filter(n => !prev.some(o => o.id === n.id))])
+      return data.length >= limit
     } catch (err) {
       console.error('Error fetching products:', err)
+      return false
     } finally {
       setLoading(prev => ({ ...prev, products: false }))
     }
+  }
+
+  // Profile specific fetchers
+  const fetchUserProducts = async (userId) => {
+    const { data } = await supabase.from('products').select('*').eq('owner_id', userId).order('created_at', { ascending: false })
+    return (data || []).map(p => mapDBProduct(p, userId))
+  }
+
+  const fetchFavoriteProducts = async (userId) => {
+    const { data } = await supabase.from('favorites').select('products(*)').eq('user_id', userId)
+    return (data || []).map(f => mapDBProduct(f.products, userId)).sort((a, b) => b.createdAt - a.createdAt)
   }
 
   const fetchFavorites = async (userId) => {
@@ -485,6 +566,10 @@ export const MarketplaceProvider = ({ children }) => {
             created_at
           )
         `)
+        // Limit to 50 latest messages to prevent memory overflow.
+        // For full pagination, ChatRoom should fetch more via an RPC.
+        .order('created_at', { foreignTable: 'messages', ascending: false })
+        .limit(50, { foreignTable: 'messages' })
         .or(`buyer_id.eq.${userId},seller_id.eq.${userId}`)
         .order('updated_at', { ascending: false })
 
@@ -729,10 +814,40 @@ export const MarketplaceProvider = ({ children }) => {
     return true
   }
 
-  // 更新商品
-  const updateListing = async (id, { title, price, description, whatsapp, wechat, instagram, locationName, lat, lng, category, tags = [], currency = 'MYR' }) => {
+  const updateListing = useCallback(async (id, { title, price, description, whatsapp, wechat, instagram, locationName, lat, lng, category, tags = [], currency = 'MYR', newImages = [], retainedImages = [], deletedImages = [] }) => {
     if (!session?.user) return null
     try {
+      // 1. Delete removed images from storage
+      for (const url of deletedImages) {
+        if (!url) continue;
+        const fileName = url.substring(url.lastIndexOf('/') + 1)
+        if (fileName) {
+          const { error } = await supabase.storage.from('product-images').remove([fileName])
+          if (error) console.error('Failed to remove old image:', error)
+        }
+      }
+
+      // 2. Upload new images
+      const newUrls = []
+      for (const file of newImages) {
+        const fileExt = file.name.split('.').pop()
+        const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`
+
+        const { error: uploadError } = await supabase.storage
+          .from('product-images')
+          .upload(fileName, file)
+
+        if (uploadError) throw uploadError
+
+        const { data: { publicUrl } } = supabase.storage
+          .from('product-images')
+          .getPublicUrl(fileName)
+
+        newUrls.push(publicUrl)
+      }
+
+      const finalImages = [...retainedImages, ...newUrls]
+
       const payload = {
         title,
         price: Number(price),
@@ -745,6 +860,10 @@ export const MarketplaceProvider = ({ children }) => {
         lng,
         contact_info: { whatsapp, wechat, instagram },
         updated_at: new Date().toISOString()
+      }
+
+      if (finalImages.length > 0) {
+        payload.images = finalImages
       }
 
       const { data, error } = await supabase
@@ -764,7 +883,7 @@ export const MarketplaceProvider = ({ children }) => {
       console.error('Error updating listing:', err)
       return null
     }
-  }
+  }, [session, fetchProducts])
 
   // 标记会话已读
   const markConversationRead = useCallback(async (conversationId) => {
@@ -1031,6 +1150,11 @@ export const MarketplaceProvider = ({ children }) => {
     deleteConversation,
     userLocation,
     setUserLocation,
+    // New Fetchers for Pagination
+    getProductById,
+    fetchProducts,
+    fetchUserProducts,
+    fetchFavoriteProducts,
     // 3.1 Loading
     loading,
     // 3.2 Toast
@@ -1041,10 +1165,11 @@ export const MarketplaceProvider = ({ children }) => {
     reportContent,
     unreadCount
   }), [listings, favorites, language, user, session, uniqueLocations, conversations, userLocation, loading, toast, unreadCount,
-    // useCallback-stabilized functions (won't cause extra re-renders)
+    // useCallback-stabilized functions
     addListing, updateListing, deleteListing, toggleFavorite, toggleLanguage, logoutUser,
     normalize, sendMessage, startConversation, markConversationRead, fetchConversations,
-    deleteConversation, reportContent, showToast, clearToast, translations])
+    deleteConversation, reportContent, showToast, clearToast, translations,
+    getProductById, fetchProducts, fetchUserProducts, fetchFavoriteProducts])
   return <MarketplaceContext.Provider value={value}>{children}</MarketplaceContext.Provider>
 }
 

@@ -6,9 +6,29 @@ import { CheckCircle, Trash2, ChevronRight, MessageSquare, UserCircle, X, Mail, 
 
 const Profile = () => {
   const navigate = useNavigate()
-  const { listings, favorites, user, language, translations, updateVerificationStatus, uploadAvatar, updateUser, deleteProduct, logoutUser, sendVerificationEmail, uploadVerificationDoc, showToast } = useMarketplace()
+  const { user, language, translations, updateVerificationStatus, uploadAvatar, updateUser, deleteProduct, logoutUser, sendVerificationEmail, uploadVerificationDoc, showToast, fetchUserProducts, fetchFavoriteProducts, session } = useMarketplace()
   const t = translations[language]
   const [tab, setTab] = useState('my')
+
+  // Data Fetching State
+  const [myListings, setMyListings] = useState([])
+  const [favoriteItems, setFavoriteItems] = useState([])
+  const [loadingData, setLoadingData] = useState(false)
+
+  useEffect(() => {
+    if (session?.user?.id) {
+      setLoadingData(true)
+      Promise.all([
+        fetchUserProducts(session.user.id),
+        fetchFavoriteProducts(session.user.id)
+      ]).then(([mine, favs]) => {
+        setMyListings(mine)
+        setFavoriteItems(favs)
+      }).finally(() => {
+        setLoadingData(false)
+      })
+    }
+  }, [session, fetchUserProducts, fetchFavoriteProducts])
 
   // Profile Edit State
   const [editing, setEditing] = useState(false)
@@ -39,8 +59,7 @@ const Profile = () => {
     setSchoolInput(user.school || '')
   }, [user.name, user.school])
 
-  const myListings = useMemo(() => listings.filter(l => l.owner === 'me'), [listings])
-  const favoriteItems = useMemo(() => listings.filter(l => favorites.includes(l.id)), [listings, favorites])
+  // myListings and favoriteItems are now state variables fetched above
 
   const handleSaveProfile = () => {
     const name = nameInput.trim()
@@ -112,9 +131,11 @@ const Profile = () => {
     }
   }
 
-  const handleDelete = (id) => {
+  const handleDelete = async (id) => {
     if (window.confirm(t.confirmDelete)) {
-      deleteProduct(id)
+      await deleteProduct(id)
+      setMyListings(prev => prev.filter(l => l.id !== id))
+      setFavoriteItems(prev => prev.filter(l => l.id !== id))
     }
   }
 

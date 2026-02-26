@@ -8,14 +8,23 @@ import ReportModal from '../components/ReportModal.jsx'
 const ChatRoom = () => {
   const { id } = useParams()
   const navigate = useNavigate()
-  const { conversations, sendMessage, language, translations, listings, session, fetchConversations, markConversationRead } = useMarketplace()
+  const { conversations, sendMessage, language, translations, getProductById, session, fetchConversations, markConversationRead } = useMarketplace()
   const t = translations[language]
   const [inputText, setInputText] = useState('')
   const [showReport, setShowReport] = useState(false)
   const scrollRef = useRef(null)
 
   const conv = conversations.find(c => c.id === id)
-  const product = listings.find(l => l.id === conv?.productId)
+  const [product, setProduct] = useState(null)
+
+  useEffect(() => {
+    if (conv?.productId) {
+      getProductById(conv.productId, session?.user?.id).then(p => {
+        if (p) setProduct(p)
+        else setProduct({ id: conv.productId, title: t.deletedProduct || 'Deleted Product', imageUrl: conv.productImage, price: 'N/A' })
+      })
+    }
+  }, [conv?.productId, getProductById, session, conv?.productImage])
 
   useEffect(() => {
     if (scrollRef.current) {

@@ -29,6 +29,12 @@ const Home = () => {
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
   const [showSearchPanel, setShowSearchPanel] = useState(false)
 
+  // Pagination & Backend Fetch States
+  const [appliedTerm, setAppliedTerm] = useState('')
+  const [page, setPage] = useState(1)
+  const [hasMore, setHasMore] = useState(true)
+  const { fetchProducts } = useMarketplace()
+
   // 搜索历史
   const [searchHistory, setSearchHistory] = useState(() => {
     try {
@@ -63,10 +69,49 @@ const Home = () => {
   }, [listings])
 
   const handleSearch = (e) => {
-    if (e.key === 'Enter' && term.trim()) {
+    if (e.key === 'Enter') {
       saveSearchTerm(term.trim())
+      setAppliedTerm(term.trim()) // Trigger backend fetch
       setShowSearchPanel(false)
     }
+  }
+
+  // Backend Pagination Fetch Effect
+  useEffect(() => {
+    let mounted = true
+    const doFetch = async () => {
+      const more = await fetchProducts(session?.user?.id, {
+        page: 1,
+        searchTerm: appliedTerm,
+        categoryFilter: activeCat,
+        locationFilter: activeLoc,
+        userLat: userLocation?.lat,
+        userLng: userLocation?.lng,
+        maxDistanceKm: distance
+      })
+      if (mounted) {
+        setHasMore(more)
+        setPage(1)
+      }
+    }
+    doFetch()
+    return () => { mounted = false }
+  }, [appliedTerm, activeCat, activeLoc, distance, userLocation, fetchProducts, session])
+
+  const loadMore = async () => {
+    if (!hasMore || loading.products) return
+    const nextPage = page + 1
+    const more = await fetchProducts(session?.user?.id, {
+      page: nextPage,
+      searchTerm: appliedTerm,
+      categoryFilter: activeCat,
+      locationFilter: activeLoc,
+      userLat: userLocation?.lat,
+      userLng: userLocation?.lng,
+      maxDistanceKm: distance
+    })
+    setHasMore(more)
+    setPage(nextPage)
   }
 
   const getDistance = (lat1, lon1, lat2, lon2) => {
@@ -102,31 +147,8 @@ const Home = () => {
     )
   }
 
-  const filtered = useMemo(() => {
-    return listings.filter(item => {
-      const q = term.toLowerCase().trim()
-      const matchTerm = q.length === 0 ||
-        item.title?.toLowerCase().includes(q) ||
-        item.description?.toLowerCase().includes(q) ||
-        (item.locationName || '').toLowerCase().includes(q) ||
-        (Array.isArray(item.tags) && item.tags.some(tag => tag.toLowerCase().includes(q)))
-
-      const matchCat = activeCat === 'All' || item.category === activeCat
-
-      const productLoc = normalize(item.locationName || '')
-      const filterLoc = normalize(activeLoc)
-      const matchLoc = activeLoc === 'All Locations' || productLoc.includes(filterLoc)
-
-      let matchDist = true
-      if (distance !== 'Any' && userLocation && item.lat && item.lng) {
-        const d = getDistance(userLocation.lat, userLocation.lng, item.lat, item.lng)
-        const limit = parseInt(distance)
-        matchDist = d <= limit
-      }
-
-      return matchTerm && matchCat && matchLoc && matchDist
-    })
-  }, [listings, term, activeCat, activeLoc, normalize, distance, userLocation])
+  // Filtered is now exactly the listings we fetched
+  const filtered = listings
 
   return (
     <div className="min-h-screen pb-24 relative">
@@ -247,44 +269,63 @@ const Home = () => {
             {[1, 2, 3, 4, 5, 6].map(i => <SkeletonCard key={i} />)}
           </div>
         ) : filtered.length > 0 ? (
-          <div className="grid grid-cols-2 lg:grid-cols-4 gap-5 pb-24">
-            {filtered.map(item => (
-              <Link to={`/product/${item.id}`} key={item.id} className="block group">
-                <div className="bg-white/80 backdrop-blur-sm rounded-[2rem] p-3 shadow-sm hover:shadow-[0_12px_30px_rgba(0,0,0,0.06)] transition-all duration-300 h-full flex flex-col border border-white/60">
-                  {/* Image Container */}
-                  <div className="aspect-square w-full rounded-2xl overflow-hidden bg-slate-100 relative mb-4">
-                    <img
-                      src={item.imageUrl}
-                      alt={item.title}
-                      loading="lazy"
-                      className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
-                    />
-                  </div>
-                  {/* Info */}
-                  <div className="flex flex-col flex-1 px-1">
-                    <h3 className="text-[13px] font-bold text-slate-800 leading-snug line-clamp-2 mb-1.5">{item.title}</h3>
-                    <p className="text-[15px] font-black text-[#10b981] mb-4">{item.currency === 'CNY' ? '¥' : 'RM'} {item.price}</p>
+          <div className="flex flex-col gap-6 pb-24">
+            <div className="grid grid-cols-2 lg:grid-cols-4 gap-5">
+              {filtered.map(item => (
+                <Link to={`/product/${item.id}`} key={item.id} className="block group">
+                  <div className="bg-white/80 backdrop-blur-sm rounded-[2rem] p-3 shadow-sm hover:shadow-[0_12px_30px_rgba(0,0,0,0.06)] transition-all duration-300 h-full flex flex-col border border-white/60">
+                    {/* Image Container */}
+                    <div className="aspect-square w-full rounded-2xl overflow-hidden bg-slate-100 relative mb-4">
+                      <img
+                        src={item.imageUrl}
+                        alt={item.title}
+                        loading="lazy"
+                        className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500"
+                      />
+                    </div>
+                    {/* Info */}
+                    <div className="flex flex-col flex-1 px-1">
+                      <h3 className="text-[13px] font-bold text-slate-800 leading-snug line-clamp-2 mb-1.5">{item.title}</h3>
+                      <p className="text-[15px] font-black text-[#10b981] mb-4">{item.currency === 'CNY' ? '¥' : 'RM'} {item.price}</p>
 
-                    {/* Action Row */}
-                    <div className="mt-auto flex items-center justify-between gap-2">
-                      <button className="flex-1 bg-emerald-50 text-emerald-600 py-2.5 rounded-2xl text-[13px] font-bold hover:bg-emerald-100 transition-colors">
-                        Buy Now
-                      </button>
-                      <button
-                        onClick={(e) => {
-                          e.preventDefault()
-                          e.stopPropagation()
-                          toggleFavorite(item.id)
-                        }}
-                        className={`w-10 h-10 shrink-0 flex items-center justify-center rounded-2xl transition-colors ${favorites.includes(item.id) ? 'bg-rose-50 text-rose-500' : 'bg-slate-50 text-slate-300 hover:bg-slate-100 hover:text-slate-400'}`}
-                      >
-                        <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" /></svg>
-                      </button>
+                      {/* Action Row */}
+                      <div className="mt-auto flex items-center justify-between gap-2">
+                        <button className="flex-1 bg-emerald-50 text-emerald-600 py-2.5 rounded-2xl text-[13px] font-bold hover:bg-emerald-100 transition-colors">
+                          Buy Now
+                        </button>
+                        <button
+                          onClick={(e) => {
+                            e.preventDefault()
+                            e.stopPropagation()
+                            toggleFavorite(item.id)
+                          }}
+                          className={`w-10 h-10 shrink-0 flex items-center justify-center rounded-2xl transition-colors ${favorites.includes(item.id) ? 'bg-rose-50 text-rose-500' : 'bg-slate-50 text-slate-300 hover:bg-slate-100 hover:text-slate-400'}`}
+                        >
+                          <svg xmlns="http://www.w3.org/2000/svg" width="18" height="18" viewBox="0 0 24 24" fill="currentColor" stroke="none"><path d="M19 14c1.49-1.46 3-3.21 3-5.5A5.5 5.5 0 0 0 16.5 3c-1.76 0-3 .5-4.5 2-1.5-1.5-2.74-2-4.5-2A5.5 5.5 0 0 0 2 8.5c0 2.3 1.5 4.05 3 5.5l7 7Z" /></svg>
+                        </button>
+                      </div>
                     </div>
                   </div>
-                </div>
-              </Link>
-            ))}
+                </Link>
+              ))}
+            </div>
+            {hasMore ? (
+              <button
+                onClick={loadMore}
+                className="w-full bg-white/60 hover:bg-white backdrop-blur-sm shadow-sm border border-slate-100 text-teal-600 font-bold py-4 rounded-2xl flex items-center justify-center gap-2 transition-colors active:scale-95"
+                disabled={loading.products}
+              >
+                {loading.products ? (
+                  <div className="w-5 h-5 border-2 border-teal-500 border-t-transparent rounded-full animate-spin"></div>
+                ) : (
+                  <span>{language === 'zh' ? '加载更多' : 'Load More'}</span>
+                )}
+              </button>
+            ) : (
+              <div className="text-center text-slate-400 text-xs font-bold py-6">
+                {language === 'zh' ? "没有更多商品了 🍋" : "No more products 🍋"}
+              </div>
+            )}
           </div>
         ) : (
           <div className="flex flex-col items-center justify-center h-48 text-slate-400">

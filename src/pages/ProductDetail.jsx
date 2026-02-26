@@ -7,20 +7,46 @@ import ReportModal from '../components/ReportModal.jsx'
 
 const ProductDetail = () => {
   const { id } = useParams()
-  const { listings, language, translations, startConversation, user, favorites, toggleFavorite, session, loading, showToast } = useMarketplace()
+  const { getProductById, language, translations, startConversation, user, favorites, toggleFavorite, session, showToast } = useMarketplace()
   const navigate = useNavigate()
   const t = translations[language]
-  const item = listings.find(l => l.id === id)
+
+  const [item, setItem] = useState(null)
+  const [loadingItem, setLoadingItem] = useState(true)
+
+  useEffect(() => {
+    let mounted = true
+    setLoadingItem(true)
+    getProductById(id, session?.user?.id).then(res => {
+      if (mounted) {
+        setItem(res)
+        setLoadingItem(false)
+      }
+    })
+    return () => { mounted = false }
+  }, [id, getProductById, session?.user?.id])
 
   // Hooks must be called before any conditional returns (React Rules of Hooks)
-  const [activeImageIdx, setActiveImageIdx] = useState(0)
   const [showReport, setShowReport] = useState(false)
+  const [activeImageIdx, setActiveImageIdx] = useState(0)
 
-  if (loading.products) return <SkeletonDetail />
+  if (loadingItem) return <SkeletonDetail />
   if (!item) return <div className="mx-auto max-w-md px-4 pt-4">{t.noItemsFound}</div>
 
   const images = item.imageUrls || [item.imageUrl]
   const isOwner = session?.user?.id && session.user.id === item.owner_id
+
+  const handleScroll = (e) => {
+    if (!e.target) return
+    const scrollLeft = e.target.scrollLeft
+    const width = e.target.clientWidth
+    if (width > 0) {
+      const idx = Math.round(scrollLeft / width)
+      if (idx !== activeImageIdx) {
+        setActiveImageIdx(idx)
+      }
+    }
+  }
 
   const handleChat = async () => {
     if (!user || user.verificationStatus !== 'verified') {
@@ -53,49 +79,59 @@ const ProductDetail = () => {
       <div className="mx-auto max-w-6xl md:p-8">
         <div className="md:grid md:grid-cols-2 md:gap-12">
           {/* Images */}
-          <div className="relative group">
-            <div className="w-full aspect-square md:rounded-[3rem] overflow-hidden bg-white/50 backdrop-blur-sm relative shadow-sm border border-white/60">
-              <img src={images[activeImageIdx]} alt={item.title} className="w-full h-full object-contain md:object-cover mix-blend-multiply" onError={(e) => { e.target.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 400 400%22%3E%3Crect fill=%22%23f3f4f6%22 width=%22400%22 height=%22400%22/%3E%3Ctext fill=%22%239ca3af%22 font-family=%22system-ui%22 font-size=%2216%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Image%3C/text%3E%3C/svg%3E' }} />
-              <button onClick={() => navigate(-1)} className="absolute top-4 left-4 p-2 bg-white/80 backdrop-blur-md rounded-full shadow-sm md:hidden text-gray-700">
-                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5" /><path d="M12 19l-7-7 7-7" /></svg>
-              </button>
-              {/* Edit button for owner */}
-              {isOwner && (
-                <button
-                  onClick={() => navigate(`/edit/${item.id}`)}
-                  className="absolute top-4 right-4 p-2.5 bg-white/90 backdrop-blur-md rounded-full shadow-md text-emerald-600 hover:bg-emerald-50 transition-colors"
-                >
-                  <Edit3 size={18} />
-                </button>
-              )}
-              {!isOwner && session && (
-                <button
-                  onClick={() => setShowReport(true)}
-                  className="absolute top-4 right-4 p-2 bg-white/90 backdrop-blur-md rounded-full shadow-md text-slate-400 hover:text-orange-500 hover:bg-orange-50 transition-colors hidden md:block"
-                >
-                  <Flag size={16} />
-                </button>
-              )}
-              {/* Mobile Favorite Button */}
-              {!isOwner && (
-                <button
-                  onClick={() => toggleFavorite(item.id)}
-                  className="absolute bottom-4 right-4 p-3 bg-white/90 backdrop-blur-md rounded-full shadow-sm md:hidden text-slate-300 transition-all border border-white/50 z-10 active:scale-95"
-                >
-                  <Heart size={20} className={favorites.includes(item.id) ? 'fill-amber-400 text-amber-400' : 'text-slate-400'} />
-                </button>
-              )}
+          <div className="relative group w-full aspect-square md:rounded-[3rem] overflow-hidden bg-white/50 backdrop-blur-sm shadow-sm border border-white/60">
+            {/* Scrollable Images Container */}
+            <div
+              className="w-full h-full flex overflow-x-auto snap-x snap-mandatory scrollbar-hide"
+              style={{ scrollBehavior: 'smooth' }}
+              onScroll={handleScroll}
+            >
+              {images.map((img, idx) => (
+                <div key={idx} className="w-full h-full flex-shrink-0 snap-center relative">
+                  <img src={img} alt={`${item.title} ${idx + 1}`} className="w-full h-full object-contain md:object-cover mix-blend-multiply" onError={(e) => { e.target.src = 'data:image/svg+xml,%3Csvg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 400 400%22%3E%3Crect fill=%22%23f3f4f6%22 width=%22400%22 height=%22400%22/%3E%3Ctext fill=%22%239ca3af%22 font-family=%22system-ui%22 font-size=%2216%22 x=%2250%25%22 y=%2250%25%22 dominant-baseline=%22middle%22 text-anchor=%22middle%22%3ENo Image%3C/text%3E%3C/svg%3E' }} />
+                </div>
+              ))}
             </div>
 
+            <button onClick={() => navigate(-1)} className="absolute top-4 left-4 p-2 bg-white/80 backdrop-blur-md rounded-full shadow-sm md:hidden text-gray-700 z-10">
+              <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M19 12H5" /><path d="M12 19l-7-7 7-7" /></svg>
+            </button>
+            {/* Edit button for owner */}
+            {isOwner && (
+              <button
+                onClick={() => navigate(`/edit/${item.id}`)}
+                className="absolute top-4 right-4 p-2.5 bg-white/90 backdrop-blur-md rounded-full shadow-md text-emerald-600 hover:bg-emerald-50 transition-colors z-10"
+              >
+                <Edit3 size={18} />
+              </button>
+            )}
+            {!isOwner && session && (
+              <button
+                onClick={() => setShowReport(true)}
+                className="absolute top-4 right-4 p-2 bg-white/90 backdrop-blur-md rounded-full shadow-md text-slate-400 hover:text-orange-500 hover:bg-orange-50 transition-colors hidden md:block z-10"
+              >
+                <Flag size={16} />
+              </button>
+            )}
+            {/* Mobile Favorite Button */}
+            {!isOwner && (
+              <button
+                onClick={() => toggleFavorite(item.id)}
+                className="absolute bottom-4 right-4 p-3 bg-white/90 backdrop-blur-md rounded-full shadow-sm md:hidden text-slate-300 transition-all border border-white/50 z-10 active:scale-95"
+              >
+                <Heart size={20} className={favorites.includes(item.id) ? 'fill-amber-400 text-amber-400' : 'text-slate-400'} />
+              </button>
+            )}
+
+            {/* Dots Indicator */}
             {images.length > 1 && (
-              <div className="absolute bottom-4 left-0 right-0 px-4 md:static md:mt-4 md:px-0">
-                <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide md:justify-center">
-                  {images.map((img, idx) => (
-                    <button key={idx} onClick={() => setActiveImageIdx(idx)} className={`w-14 h-14 md:w-16 md:h-16 rounded-xl border-2 overflow-hidden flex-shrink-0 transition-all ${activeImageIdx === idx ? 'border-emerald-500 shadow-lg scale-105' : 'border-transparent bg-gray-100 opacity-70 hover:opacity-100'}`}>
-                      <img src={img} alt="" loading="lazy" className="w-full h-full object-cover" />
-                    </button>
-                  ))}
-                </div>
+              <div className="absolute bottom-6 left-1/2 -translate-x-1/2 flex gap-2 z-10 pointer-events-none">
+                {images.map((_, idx) => (
+                  <div
+                    key={idx}
+                    className={`w-1.5 h-1.5 rounded-full shadow-sm transition-all ${idx === activeImageIdx ? 'bg-white scale-125' : 'bg-black/30'}`}
+                  />
+                ))}
               </div>
             )}
           </div>
