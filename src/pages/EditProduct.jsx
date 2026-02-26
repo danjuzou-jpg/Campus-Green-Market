@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate, Navigate } from 'react-router-dom'
 import { useMarketplace } from '../context/MarketplaceContext.jsx'
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
+import LocationPicker from '../components/LocationPicker.jsx'
 import { ArrowLeft, X, Plus } from 'lucide-react'
 import { LoadingButton } from '../components/LoadingSpinner.jsx'
 import { compressImages } from '../lib/imageUtils.js'
@@ -98,15 +98,7 @@ const EditProduct = () => {
         }
     }
 
-    const ClickPicker = () => {
-        useMapEvents({
-            click(e) {
-                setLatlng({ lat: e.latlng.lat, lng: e.latlng.lng })
-                if (!locationName.trim()) setLocationName('Custom Pin')
-            }
-        })
-        return null
-    }
+
 
     const handleRemoveRetained = (url) => {
         setRetainedImages(prev => prev.filter(u => u !== url))
@@ -224,17 +216,14 @@ const EditProduct = () => {
                 {/* Location */}
                 <div className="space-y-3 pt-2">
                     <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider ml-1">{t.location}</label>
-                    <input value={locationName} onChange={e => setLocationName(e.target.value)} list="edit-loc" className="w-full bg-gray-50 border border-gray-200 rounded-lg p-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all" />
-                    <datalist id="edit-loc">
-                        {locations.map((loc, i) => (<option key={i} value={loc} />))}
-                    </datalist>
-                    <div className="h-40 w-full rounded-xl overflow-hidden shadow-inner relative z-0">
-                        <MapContainer center={latlng} zoom={15} style={{ height: '100%', width: '100%' }}>
-                            <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" />
-                            <Marker position={latlng} />
-                            <ClickPicker />
-                        </MapContainer>
-                    </div>
+                    <LocationPicker
+                        locationName={locationName}
+                        setLocationName={setLocationName}
+                        latlng={latlng}
+                        setLatlng={setLatlng}
+                        language={language}
+                        locations={locations}
+                    />
                 </div>
 
                 {/* Contact */}

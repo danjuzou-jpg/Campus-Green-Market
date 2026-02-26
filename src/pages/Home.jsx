@@ -2,7 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMarketplace } from '../context/MarketplaceContext.jsx'
 import { SkeletonCard } from '../components/Skeleton.jsx'
-import { Search, Menu, X, LayoutGrid, MonitorSmartphone, Sparkles, Sofa, BookOpen, Gamepad2, Building2, Package } from 'lucide-react'
+import { Search, Menu, X, LayoutGrid, MonitorSmartphone, Sparkles, Sofa, BookOpen, Gamepad2, Building2, Package, MapPin } from 'lucide-react'
 
 const fmtDate = (ts, lang) => {
   const d = new Date(ts)
@@ -68,10 +68,19 @@ const Home = () => {
       .map(([tag]) => tag)
   }, [listings])
 
+  const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+
   const handleSearch = (e) => {
     if (e.key === 'Enter') {
-      saveSearchTerm(term.trim())
-      setAppliedTerm(term.trim()) // Trigger backend fetch
+      const q = term.trim()
+      if (!q) return
+      // 识别 UUID 格式 → 跳转用户主页
+      if (UUID_REGEX.test(q)) {
+        navigate(`/user/${q}`)
+        return
+      }
+      saveSearchTerm(q)
+      setAppliedTerm(q)
       setShowSearchPanel(false)
     }
   }
@@ -169,7 +178,7 @@ const Home = () => {
             value={term}
             onChange={e => setTerm(e.target.value)}
             onKeyDown={handleSearch}
-            placeholder={t.searchPlaceholder || "Search Citrus..."}
+            placeholder={language === 'zh' ? '搜索商品 / 输入用户ID' : 'Search items / User ID'}
             className="bg-transparent border-none outline-none text-slate-700 placeholder-slate-400 font-bold text-[13px] w-full"
           />
         </div>
@@ -187,7 +196,7 @@ const Home = () => {
           {/* Drawer */}
           <div className="relative w-72 h-full bg-white/95 backdrop-blur-xl shadow-2xl border-r border-white/60 flex flex-col transform transition-transform duration-300">
             <div className="p-6 flex items-center justify-between border-b border-slate-100">
-              <h2 className="text-xl font-black text-slate-800 tracking-tight">{t.categories}</h2>
+              <h2 className="text-xl font-black text-slate-800 tracking-tight">{language === 'zh' ? '选择地点' : 'Select Location'}</h2>
               <button
                 onClick={() => setIsSidebarOpen(false)}
                 className="p-2 rounded-full hover:bg-slate-100 active:bg-slate-200 text-slate-400 transition-colors"
@@ -197,29 +206,22 @@ const Home = () => {
             </div>
             <div className="p-4 flex-1 overflow-y-auto">
               <div className="flex flex-col gap-2">
-                {categories.map((cat) => {
-                  const isSelected = activeCat === cat.key
+                {locations.map((loc) => {
+                  const isSelected = activeLoc === loc
                   return (
                     <button
-                      key={cat.key}
+                      key={loc}
                       onClick={() => {
-                        setActiveCat(cat.key)
+                        setActiveLoc(loc)
                         setIsSidebarOpen(false)
                       }}
                       className={`flex items-center gap-4 w-full p-3 rounded-2xl transition-all active:scale-95 ${isSelected ? 'bg-teal-50 text-teal-700 shadow-sm border border-teal-100/50' : 'hover:bg-slate-50 text-slate-600 border border-transparent'}`}
                     >
                       <div className={`w-10 h-10 shrink-0 rounded-[12px] flex items-center justify-center shadow-sm overflow-hidden ${isSelected ? 'bg-white text-teal-600' : 'bg-slate-100 text-slate-500'}`}>
-                        {cat.key === 'All' && <LayoutGrid size={20} />}
-                        {cat.key === 'Digital' && <MonitorSmartphone size={20} />}
-                        {cat.key === 'Fashion' && <Sparkles size={20} />}
-                        {cat.key === 'Home' && <Sofa size={20} />}
-                        {cat.key === 'Learning' && <BookOpen size={20} />}
-                        {cat.key === 'Hobbies' && <Gamepad2 size={20} />}
-                        {cat.key === 'Rentals' && <Building2 size={20} />}
-                        {cat.key === 'Others' && <Package size={20} />}
+                        {loc === 'All Locations' ? <LayoutGrid size={20} /> : <MapPin size={20} />}
                       </div>
                       <span className="font-bold text-[14px]">
-                        {language === 'zh' ? cat.zh : cat.en}
+                        {loc === 'All Locations' ? t.allLocations || 'All Locations' : loc}
                       </span>
                     </button>
                   )
@@ -248,16 +250,24 @@ const Home = () => {
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400"><path d="m6 9 6 6 6-6" /></svg>
           </div>
         </div>
-        {locations.map(loc => (
+        {categories.map(cat => (
           <button
-            key={loc}
-            onClick={() => setActiveLoc(loc)}
-            className={`px-5 py-2.5 rounded-full text-xs font-bold transition-all shadow-sm whitespace-nowrap ${activeLoc === loc
+            key={cat.key}
+            onClick={() => setActiveCat(cat.key)}
+            className={`px-5 py-2.5 rounded-full text-xs font-bold transition-all shadow-sm whitespace-nowrap flex items-center gap-2 ${activeCat === cat.key
               ? 'bg-[#10b981] text-white shadow-[0_4px_12px_rgba(16,185,129,0.3)]'
               : 'bg-white text-slate-500 hover:bg-slate-50'
               }`}
           >
-            {loc}
+            {cat.key === 'All' && <LayoutGrid size={14} />}
+            {cat.key === 'Digital' && <MonitorSmartphone size={14} />}
+            {cat.key === 'Fashion' && <Sparkles size={14} />}
+            {cat.key === 'Home' && <Sofa size={14} />}
+            {cat.key === 'Learning' && <BookOpen size={14} />}
+            {cat.key === 'Hobbies' && <Gamepad2 size={14} />}
+            {cat.key === 'Rentals' && <Building2 size={14} />}
+            {cat.key === 'Others' && <Package size={14} />}
+            <span>{language === 'zh' ? cat.zh : cat.en}</span>
           </button>
         ))}
       </div>

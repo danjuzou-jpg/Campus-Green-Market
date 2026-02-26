@@ -1,13 +1,13 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useMarketplace } from '../context/MarketplaceContext.jsx'
-import { MapPin, Phone, MessageSquare, Heart, Lock, Edit3, Flag } from 'lucide-react'
+import { MapPin, Phone, MessageSquare, Heart, Lock, Edit3, Flag, ExternalLink } from 'lucide-react'
 import { SkeletonDetail } from '../components/Skeleton.jsx'
 import ReportModal from '../components/ReportModal.jsx'
 
 const ProductDetail = () => {
   const { id } = useParams()
-  const { getProductById, language, translations, startConversation, user, favorites, toggleFavorite, session, showToast } = useMarketplace()
+  const { getProductById, language, translations, findConversation, user, favorites, toggleFavorite, session, showToast } = useMarketplace()
   const navigate = useNavigate()
   const t = translations[language]
 
@@ -54,11 +54,13 @@ const ProductDetail = () => {
       navigate('/profile')
       return
     }
-    const convId = await startConversation(item)
-    if (convId) {
-      navigate(`/chat/${convId}`)
+    // 查找已有会话
+    const existingId = await findConversation(item.id)
+    if (existingId) {
+      navigate(`/chat/${existingId}`)
     } else {
-      showToast('error', language === 'zh' ? '无法开启对话' : 'Failed to start conversation')
+      // 没有已有会话 → 跳转到新聊天页面（不创建 DB 记录）
+      navigate(`/chat/new?productId=${item.id}`)
     }
   }
 
@@ -146,10 +148,16 @@ const ProductDetail = () => {
                   <div className="text-teal-600 text-3xl font-black whitespace-nowrap">{item.currency === 'CNY' ? '¥' : 'RM'} {item.price}</div>
                 </div>
                 {item.locationName && (
-                  <div className="mt-4 inline-flex items-center gap-1.5 px-4 py-1.5 bg-teal-50 text-teal-700 rounded-full text-[13px] font-bold">
+                  <a
+                    href={`https://www.google.com/maps/search/${encodeURIComponent(item.locationName)}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="mt-4 inline-flex items-center gap-1.5 px-4 py-1.5 bg-teal-50 text-teal-700 rounded-full text-[13px] font-bold hover:bg-teal-100 active:scale-95 transition-all cursor-pointer"
+                  >
                     <MapPin size={16} />
                     <span>{item.locationName}</span>
-                  </div>
+                    <ExternalLink size={12} className="text-teal-400 ml-0.5" />
+                  </a>
                 )}
               </div>
 

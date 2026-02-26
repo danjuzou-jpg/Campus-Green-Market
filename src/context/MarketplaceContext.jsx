@@ -32,7 +32,30 @@ export const MarketplaceProvider = ({ children }) => {
     verificationStatus: 'unverified',
     avatar: 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&q=80'
   })
-  const [locations, setLocations] = useState(['All Locations', 'Ryan & Miho', 'Pacific Tower', 'South Link', 'UM Library', 'Jaya One'])
+  const [locations, setLocations] = useState(['All Locations'])
+
+  // 从 DB 动态获取所有地点
+  const fetchLocations = useCallback(async () => {
+    try {
+      const { data, error } = await supabase
+        .from('products')
+        .select('location_name')
+        .not('location_name', 'is', null)
+        .not('location_name', 'eq', '')
+      if (data) {
+        let names = [...new Set(data.map(d => d.location_name).filter(Boolean))]
+        // 将"线上"地点单独提取出来放在最后
+        const hasOnline = names.includes('线上')
+        names = names.filter(n => n !== '线上').sort()
+        if (hasOnline) {
+          names.push('线上')
+        }
+        setLocations(['All Locations', ...names])
+      }
+    } catch (err) {
+      console.warn('Error fetching locations:', err)
+    }
+  }, [])
 
   // Ensure locations are unique
   const uniqueLocations = useMemo(() => [...new Set(locations)], [locations])
@@ -313,6 +336,7 @@ export const MarketplaceProvider = ({ children }) => {
     // Check active session
     supabase.auth.getSession().then(({ data: { session } }) => {
       setSession(session)
+      fetchLocations()
       if (session?.user) {
         fetchProfile(session.user.id)
         fetchFavorites(session.user.id)
@@ -590,6 +614,7 @@ export const MarketplaceProvider = ({ children }) => {
             productTitle: c.product_title,
             productImage: c.product_image,
             sellerName: otherName || 'User',
+            otherUserId: isBuyer ? c.seller_id : c.buyer_id,
             messages: c.messages.map(m => ({
               id: m.id,
               text: m.content,
@@ -669,8 +694,9 @@ export const MarketplaceProvider = ({ children }) => {
         throw error
       }
 
-      // Refresh listings
+      // Refresh listings and locations
       fetchProducts(session.user.id)
+      fetchLocations()
       return data.id
 
     } catch (err) {
@@ -708,6 +734,7 @@ export const MarketplaceProvider = ({ children }) => {
         .eq('owner_id', session.user.id) // RLS 额外保障，与 updateListing 一致
       if (error) throw error
       setListings(prev => prev.filter(l => l.id !== id))
+      fetchLocations() // 同步更新地点列表
       showToast('success', language === 'zh' ? '商品已删除' : 'Item deleted')
       return true
     } catch (err) {
@@ -715,7 +742,7 @@ export const MarketplaceProvider = ({ children }) => {
       showToast('error', language === 'zh' ? '删除失败' : 'Failed to delete')
       return false
     }
-  }, [session, language, showToast, listings])
+  }, [session, language, showToast, listings, fetchLocations])
 
   const deleteProduct = useCallback((id) => deleteListing(id), [deleteListing])
 
@@ -982,15 +1009,7 @@ export const MarketplaceProvider = ({ children }) => {
     }
   }
 
-  const addLocation = (newLoc) => {
-    // Local only for now, or could be a 'locations' table
-    const name = (newLoc || '').trim()
-    if (!name) return
-    const exists = locations.some(loc => normalize(loc) === normalize(name))
-    if (!exists) {
-      setLocations(prev => [...prev, name])
-    }
-  }
+
 
   // 3.6 举报功能
   const reportContent = useCallback(async (type, targetId, reason, details = '') => {
@@ -1078,15 +1097,42 @@ export const MarketplaceProvider = ({ children }) => {
     }
   }, [session, language, showToast])
 
-  const startConversation = useCallback(async (product) => {
-    if (!session?.user) return
+  // 只查找已有会话，不创建新会话
+  const findConversation = useCallback(async (productId) => {
+    if (!session?.user) return null
 
     // 1. Check local state
-    const existing = conversations.find(c => c.productId === product.id)
+    const existing = conversations.find(c => c.productId === productId)
     if (existing) return existing.id
 
     try {
-      // 2. Check DB to be safe (avoid duplicates)
+      // 2. Check DB to be safe
+      const { data: existingRemote } = await supabase
+        .from('conversations')
+        .select('id')
+        .eq('product_id', productId)
+        .eq('buyer_id', session.user.id)
+        .maybeSingle()
+
+      return existingRemote?.id || null
+    } catch (err) {
+      console.error('Error finding conversation:', err)
+      return null
+    }
+  }, [session, conversations])
+
+  // 原子地创建会话并发送第一条消息（延迟创建：只有发消息时才建会话）
+  const createConversationWithMessage = useCallback(async (product, messageText) => {
+    if (!session?.user) return null
+
+    // 防止自己给自己发消息
+    if (product.owner_id === session.user.id) {
+      showToast('warning', language === 'zh' ? '不能给自己的商品发消息' : 'Cannot message your own product')
+      return null
+    }
+
+    try {
+      // 再次检查是否已存在（防止并发重复）
       const { data: existingRemote } = await supabase
         .from('conversations')
         .select('id')
@@ -1094,49 +1140,93 @@ export const MarketplaceProvider = ({ children }) => {
         .eq('buyer_id', session.user.id)
         .maybeSingle()
 
-      if (existingRemote) {
-        return existingRemote.id
+      let convId = existingRemote?.id
+
+      if (!convId) {
+        // 获取卖家真实昵称
+        let sellerRealName = 'Seller'
+        try {
+          const { data: sellerProfile } = await supabase
+            .from('profiles')
+            .select('full_name')
+            .eq('id', product.owner_id)
+            .single()
+          if (sellerProfile?.full_name) sellerRealName = sellerProfile.full_name
+        } catch (e) {
+          console.warn('Could not fetch seller name:', e)
+        }
+
+        // 创建会话
+        const { data: convData, error: convError } = await supabase
+          .from('conversations')
+          .insert({
+            product_id: product.id,
+            buyer_id: session.user.id,
+            seller_id: product.owner_id,
+            product_title: product.title,
+            product_image: product.imageUrls?.[0] || product.imageUrl,
+            seller_name: sellerRealName,
+            buyer_name: user.name,
+            last_message: messageText,
+            updated_at: new Date().toISOString()
+          })
+          .select()
+          .single()
+
+        if (convError) throw convError
+        convId = convData.id
       }
 
-      // 3. Create new conversation
-      const { data, error } = await supabase
-        .from('conversations')
+      // 发送第一条消息
+      const { data: msgData, error: msgError } = await supabase
+        .from('messages')
         .insert({
-          product_id: product.id,
-          buyer_id: session.user.id,
-          seller_id: product.owner_id,
-          product_title: product.title,
-          product_image: product.imageUrl,
-          seller_name: product.owner === 'others' ? 'Seller' : 'Buyer',
-          buyer_name: user.name
+          conversation_id: convId,
+          sender_id: session.user.id,
+          content: messageText
         })
         .select()
         .single()
 
-      if (error) {
-        console.error('Error creating conversation:', error)
-        throw error
-      }
+      if (msgError) throw msgError
 
-      if (data) {
-        const newConv = {
-          id: data.id,
-          productId: product.id,
-          productTitle: product.title,
-          productImage: product.imageUrl,
-          sellerName: 'Seller',
-          messages: [],
-          lastMessage: '',
-          lastTimestamp: Date.now()
-        }
-        setConversations(prev => [newConv, ...prev])
-        return data.id
+      // 更新 conversation 的 last_message
+      await supabase
+        .from('conversations')
+        .update({ updated_at: new Date().toISOString(), last_message: messageText })
+        .eq('id', convId)
+
+      // 添加到本地状态
+      const newConv = {
+        id: convId,
+        productId: product.id,
+        productTitle: product.title,
+        productImage: product.imageUrls?.[0] || product.imageUrl,
+        sellerName: 'Seller',
+        otherUserId: product.owner_id,
+        messages: [{
+          id: msgData?.id || Date.now(),
+          text: messageText,
+          sender: 'me',
+          timestamp: Date.now()
+        }],
+        lastMessage: messageText,
+        lastTimestamp: Date.now(),
+        unreadCount: 0
       }
+      setConversations(prev => {
+        // 避免重复
+        const filtered = prev.filter(c => c.id !== convId)
+        return [newConv, ...filtered]
+      })
+
+      return convId
     } catch (err) {
-      console.error('Error starting conversation:', err)
+      console.error('Error creating conversation with message:', err)
+      showToast('error', language === 'zh' ? '发送失败' : 'Failed to send')
+      return null
     }
-    return null
-  }, [session, conversations, user.name])
+  }, [session, user.name, language, showToast])
 
   const unreadCount = useMemo(() => {
     return conversations.reduce((total, conv) => total + (conv.unreadCount || 0), 0)
@@ -1162,12 +1252,13 @@ export const MarketplaceProvider = ({ children }) => {
     uploadAvatar,
     updateUser,
     locations: uniqueLocations,
-    addLocation,
+    fetchLocations,
     normalize,
     deleteProduct,
     conversations,
     sendMessage,
-    startConversation,
+    findConversation,
+    createConversationWithMessage,
     markConversationRead,
     fetchConversations,
     deleteConversation,
@@ -1190,7 +1281,7 @@ export const MarketplaceProvider = ({ children }) => {
   }), [listings, favorites, language, user, session, uniqueLocations, conversations, userLocation, loading, toast, unreadCount,
     // useCallback-stabilized functions
     addListing, updateListing, deleteListing, toggleFavorite, toggleLanguage, logoutUser,
-    normalize, sendMessage, startConversation, markConversationRead, fetchConversations,
+    normalize, sendMessage, findConversation, createConversationWithMessage, markConversationRead, fetchConversations,
     deleteConversation, reportContent, showToast, clearToast, translations,
     getProductById, fetchProducts, fetchUserProducts, fetchFavoriteProducts])
   return <MarketplaceContext.Provider value={value}>{children}</MarketplaceContext.Provider>

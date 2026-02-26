@@ -1,7 +1,7 @@
 import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMarketplace } from '../context/MarketplaceContext.jsx'
-import { MapContainer, TileLayer, Marker, useMapEvents } from 'react-leaflet'
+import LocationPicker from '../components/LocationPicker.jsx'
 import { compressImage } from '../lib/imageUtils.js'
 import { LoadingButton } from '../components/LoadingSpinner.jsx'
 
@@ -84,16 +84,7 @@ const Upload = () => {
     }
   }
 
-  const ClickPicker = () => {
-    useMapEvents({
-      click(e) {
-        const { lat, lng } = e.latlng
-        setLatlng({ lat, lng })
-        if (!locationName.trim()) setLocationName('Custom Pin')
-      }
-    })
-    return null
-  }
+
 
   const quickTags = [
     { key: 'tagNegotiable' },
@@ -193,22 +184,16 @@ const Upload = () => {
         </div>
 
         {/* Location */}
-        <div className="bg-white/80 backdrop-blur-md p-5 rounded-[2rem] shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-white/60 space-y-4">
-          <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-2 ml-1">{t.location}</label>
-          <input value={locationName} onChange={e => setLocationName(e.target.value)} placeholder={t.locationPlaceholder} list="location-suggestions" className="w-full bg-white/60 border border-white/50 rounded-2xl p-4 text-[15px] focus:outline-none focus:ring-2 focus:ring-teal-500/20 focus:bg-white transition-all shadow-sm font-medium text-slate-700" />
-          <datalist id="location-suggestions">
-            {locations.map((loc, index) => (<option key={index} value={loc} />))}
-          </datalist>
-          <div className="h-48 w-full rounded-[1.5rem] overflow-hidden relative z-0 border border-white/50 shadow-sm bg-slate-50">
-            <MapContainer center={latlng} zoom={15} style={{ height: '100%', width: '100%' }}>
-              <TileLayer url="https://{s}.basemaps.cartocdn.com/rastertiles/voyager/{z}/{x}/{y}{r}.png" attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>' />
-              <Marker position={latlng} />
-              <ClickPicker />
-            </MapContainer>
-            <div className="absolute top-3 right-3 bg-white/90 backdrop-blur px-3 py-1.5 rounded-full text-[11px] font-bold text-teal-600 shadow-sm z-[400] pointer-events-none border border-white">
-              {t.tapToPickLocation}
-            </div>
-          </div>
+        <div className="bg-white/80 backdrop-blur-md p-5 rounded-[2rem] shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-white/60">
+          <label className="block text-[11px] font-black text-slate-400 uppercase tracking-wider mb-4 ml-1">{t.location}</label>
+          <LocationPicker
+            locationName={locationName}
+            setLocationName={setLocationName}
+            latlng={latlng}
+            setLatlng={setLatlng}
+            language={language}
+            locations={locations}
+          />
         </div>
 
         {/* Contact */}

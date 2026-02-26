@@ -29,6 +29,7 @@ import ChatRoom from './pages/ChatRoom.jsx'
 import Auth from './pages/Auth.jsx'
 import EditProduct from './pages/EditProduct.jsx'
 import NotFound from './pages/NotFound.jsx'
+import UserProfile from './pages/UserProfile.jsx'
 import ErrorBoundary from './components/ErrorBoundary.jsx'
 
 // 路由守卫：需要登录才能访问的页面
@@ -68,6 +69,7 @@ const AppContent = () => {
         <Route path="/home" element={<Home />} />
         <Route path="/" element={<Home />} />
         <Route path="/product/:id" element={<ProductDetail />} />
+        <Route path="/user/:id" element={<UserProfile />} />
         <Route path="/upload" element={
           <RequireAuth><Upload /></RequireAuth>
         } />

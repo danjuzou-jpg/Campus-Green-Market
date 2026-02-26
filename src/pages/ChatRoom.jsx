@@ -1,5 +1,5 @@
 import React, { useState, useRef, useEffect } from 'react'
-import { useParams, useNavigate } from 'react-router-dom'
+import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMarketplace } from '../context/MarketplaceContext'
 import { supabase } from '../lib/supabaseClient'
 import { ChevronLeft, Send, Flag } from 'lucide-react'
@@ -7,24 +7,47 @@ import ReportModal from '../components/ReportModal.jsx'
 
 const ChatRoom = () => {
   const { id } = useParams()
+  const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { conversations, sendMessage, language, translations, getProductById, session, fetchConversations, markConversationRead } = useMarketplace()
+  const { conversations, sendMessage, language, translations, getProductById, session, fetchConversations, markConversationRead, createConversationWithMessage } = useMarketplace()
   const t = translations[language]
   const [inputText, setInputText] = useState('')
   const [showReport, setShowReport] = useState(false)
   const scrollRef = useRef(null)
 
-  const conv = conversations.find(c => c.id === id)
-  const [product, setProduct] = useState(null)
+  // 是否是新会话（还未在 DB 中创建）
+  const isNewConversation = id === 'new'
+  const productIdFromQuery = searchParams.get('productId')
 
+  const conv = isNewConversation ? null : conversations.find(c => c.id === id)
+  const [product, setProduct] = useState(null)
+  const [sellerProfile, setSellerProfile] = useState(null)
+  const [sending, setSending] = useState(false)
+
+  // 获取商品数据
   useEffect(() => {
-    if (conv?.productId) {
-      getProductById(conv.productId, session?.user?.id).then(p => {
+    const pid = isNewConversation ? productIdFromQuery : conv?.productId
+    if (pid) {
+      getProductById(pid, session?.user?.id).then(p => {
         if (p) setProduct(p)
-        else setProduct({ id: conv.productId, title: t.deletedProduct || 'Deleted Product', imageUrl: conv.productImage, price: 'N/A' })
+        else if (conv) setProduct({ id: conv.productId, title: t.deletedProduct || 'Deleted Product', imageUrl: conv.productImage, price: 'N/A' })
       })
     }
-  }, [conv?.productId, getProductById, session, conv?.productImage])
+  }, [isNewConversation, productIdFromQuery, conv?.productId, getProductById, session, conv?.productImage])
+
+  // 新会话：获取卖家资料
+  useEffect(() => {
+    if (isNewConversation && product?.owner_id) {
+      supabase
+        .from('profiles')
+        .select('full_name, avatar_url')
+        .eq('id', product.owner_id)
+        .single()
+        .then(({ data }) => {
+          if (data) setSellerProfile(data)
+        })
+    }
+  }, [isNewConversation, product?.owner_id])
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -32,14 +55,14 @@ const ChatRoom = () => {
     }
   }, [conv?.messages])
 
-  // 标记已读
+  // 标记已读（仅已存在的会话）
   useEffect(() => {
-    if (id) markConversationRead(id)
-  }, [id, conv?.messages?.length])
+    if (id && !isNewConversation) markConversationRead(id)
+  }, [id, isNewConversation, conv?.messages?.length])
 
-  // Real-time subscription
+  // Real-time subscription（仅已存在的会话）
   useEffect(() => {
-    if (!id || !session?.user) return
+    if (!id || isNewConversation || !session?.user) return
     const channel = supabase
       .channel(`conversation:${id}`)
       .on('postgres_changes', {
@@ -49,9 +72,7 @@ const ChatRoom = () => {
         filter: `conversation_id=eq.${id}`
       }, (payload) => {
         const msg = payload.new
-        // 只更新当前会话，不需要重新拉取全部会话
         if (msg.sender_id !== session.user.id) {
-          // 只处理对方发的消息，自己的已由 optimistic update 处理
           fetchConversations(session.user.id)
         }
       })
@@ -59,34 +80,69 @@ const ChatRoom = () => {
 
     return () => { supabase.removeChannel(channel) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, session?.user?.id])
+  }, [id, isNewConversation, session?.user?.id])
 
-  if (!conv) return <div className="p-4">{t.noMessages}</div>
+  // 新会话且缺少 productId 参数 → 无效访问
+  if (isNewConversation && !productIdFromQuery) {
+    return <div className="p-4">{t.noMessages}</div>
+  }
 
-  const handleSend = (e) => {
+  // 已有会话但找不到 → 显示提示
+  if (!isNewConversation && !conv) {
+    return <div className="p-4">{t.noMessages}</div>
+  }
+
+  // 确定对方名字和对方 ID
+  const otherName = isNewConversation
+    ? (sellerProfile?.full_name || 'Seller')
+    : (conv?.sellerName || 'User')
+  const otherUserId = isNewConversation
+    ? product?.owner_id
+    : conv?.otherUserId
+
+  const messages = conv?.messages || []
+
+  const handleSend = async (e) => {
     e.preventDefault()
-    if (!inputText.trim()) return
-    sendMessage(id, inputText)
-    setInputText('')
+    if (!inputText.trim() || sending) return
+
+    if (isNewConversation && product) {
+      // 延迟创建：第一条消息发送时才创建会话
+      setSending(true)
+      const realConvId = await createConversationWithMessage(product, inputText)
+      setSending(false)
+      if (realConvId) {
+        setInputText('')
+        navigate(`/chat/${realConvId}`, { replace: true })
+      }
+    } else {
+      sendMessage(id, inputText)
+      setInputText('')
+    }
   }
 
   return (
-    <div className="mx-auto max-w-2xl h-screen flex flex-col bg-gray-50 fixed inset-0 z-[60]">
+    <div className="mx-auto max-w-2xl h-screen h-[100dvh] flex flex-col bg-gray-50 fixed inset-0 z-[60]">
       {/* Header */}
       <div className="bg-white border-b px-4 py-3 flex items-center gap-3 shrink-0">
         <button onClick={() => navigate(-1)} className="p-1 -ml-1">
           <ChevronLeft size={24} />
         </button>
-        <div className="flex-1">
-          <div className="font-bold text-gray-900 leading-tight">{conv.sellerName}</div>
+        <div
+          className="flex-1 cursor-pointer active:opacity-70 transition-opacity"
+          onClick={() => otherUserId && navigate(`/user/${otherUserId}`)}
+        >
+          <div className="font-bold text-gray-900 leading-tight">{otherName}</div>
           <div className="text-[10px] text-green-500 font-medium">● {t.online}</div>
         </div>
-        <button
-          onClick={() => setShowReport(true)}
-          className="p-2 rounded-full hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
-        >
-          <Flag size={16} />
-        </button>
+        {!isNewConversation && (
+          <button
+            onClick={() => setShowReport(true)}
+            className="p-2 rounded-full hover:bg-red-50 text-gray-400 hover:text-red-500 transition-colors"
+          >
+            <Flag size={16} />
+          </button>
+        )}
       </div>
 
       {/* Product Info */}
@@ -113,7 +169,7 @@ const ChatRoom = () => {
           </span>
         </div>
 
-        {conv.messages.map((msg) => (
+        {messages.map((msg) => (
           <div key={msg.id} className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
             <div className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm shadow-sm ${msg.sender === 'me'
               ? 'bg-indigo-600 text-white rounded-tr-none'
@@ -126,10 +182,23 @@ const ChatRoom = () => {
             </div>
           </div>
         ))}
+
+        {/* 新会话提示 */}
+        {isNewConversation && messages.length === 0 && (
+          <div className="text-center py-8">
+            <p className="text-xs text-gray-400 font-medium">
+              {language === 'zh' ? '发送第一条消息开始对话' : 'Send a message to start the conversation'}
+            </p>
+          </div>
+        )}
       </div>
 
-      {/* Input */}
-      <form onSubmit={handleSend} className="bg-white border-t p-4 flex gap-2 shrink-0 pb-safe pb-8">
+      {/* Input — 使用 max() 正确处理安全区域 */}
+      <form
+        onSubmit={handleSend}
+        className="bg-white border-t px-4 pt-4 flex gap-2 shrink-0"
+        style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0.5rem))' }}
+      >
         <input
           type="text"
           value={inputText}
@@ -137,13 +206,21 @@ const ChatRoom = () => {
           placeholder={t.typeMessage}
           className="flex-1 bg-gray-100 rounded-2xl px-4 py-2 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 transition-all"
         />
-        <button type="submit" disabled={!inputText.trim()} className="w-10 h-10 bg-emerald-500 text-white rounded-full flex items-center justify-center disabled:opacity-50 shadow-lg shadow-emerald-200 active:scale-90 transition-all">
-          <Send size={18} />
+        <button
+          type="submit"
+          disabled={!inputText.trim() || sending}
+          className="w-10 h-10 bg-emerald-500 text-white rounded-full flex items-center justify-center disabled:opacity-50 shadow-lg shadow-emerald-200 active:scale-90 transition-all"
+        >
+          {sending ? (
+            <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+          ) : (
+            <Send size={18} />
+          )}
         </button>
       </form>
 
       {/* Report Modal */}
-      {showReport && (
+      {showReport && conv && (
         <ReportModal
           type="user"
           targetId={conv.id}
