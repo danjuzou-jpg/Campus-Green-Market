@@ -475,7 +475,7 @@ export const MarketplaceProvider = ({ children }) => {
   })
 
   // Home Page Paged Search
-  const fetchProducts = async (currentUserId = null, {
+  const fetchProducts = useCallback(async (currentUserId = null, {
     page = 1,
     limit = 20,
     searchTerm = '',
@@ -523,20 +523,20 @@ export const MarketplaceProvider = ({ children }) => {
     } finally {
       setLoading(prev => ({ ...prev, products: false }))
     }
-  }
+  }, [])
 
   // Profile specific fetchers
-  const fetchUserProducts = async (userId) => {
+  const fetchUserProducts = useCallback(async (userId) => {
     const { data } = await supabase.from('products').select('*').eq('owner_id', userId).order('created_at', { ascending: false })
     return (data || []).map(p => mapDBProduct(p, userId))
-  }
+  }, [])
 
-  const fetchFavoriteProducts = async (userId) => {
+  const fetchFavoriteProducts = useCallback(async (userId) => {
     const { data } = await supabase.from('favorites').select('products(*)').eq('user_id', userId)
     return (data || []).map(f => mapDBProduct(f.products, userId)).sort((a, b) => b.createdAt - a.createdAt)
-  }
+  }, [])
 
-  const fetchFavorites = async (userId) => {
+  const fetchFavorites = useCallback(async (userId) => {
     try {
       const { data, error } = await supabase
         .from('favorites')
@@ -549,7 +549,7 @@ export const MarketplaceProvider = ({ children }) => {
     } catch (err) {
       console.error('Error fetching favorites:', err)
     }
-  }
+  }, [])
 
   const fetchConversations = useCallback(async (userId) => {
     // This is a simplified fetch. In a real app, you might join with profiles/products.
