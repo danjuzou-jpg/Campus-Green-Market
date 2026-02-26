@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react'
+import React, { createContext, useContext, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 
 const MarketplaceContext = createContext(null)
@@ -45,12 +45,15 @@ export const MarketplaceProvider = ({ children }) => {
 
   // ── 3.2 Toast 通知状态 ──
   const [toast, setToast] = useState(null)
-  const showToast = (type, message, duration = 3000) => {
+  const showToast = useCallback((type, message, duration = 3000) => {
     setToast({ type, message, duration })
-  }
-  const clearToast = () => setToast(null)
+  }, [])
+  const clearToast = useCallback(() => setToast(null), [])
 
-  const normalize = (str) => str.toLowerCase().replace(/[^a-z0-9]/g, '');
+  const normalize = useCallback((str) => str.toLowerCase().replace(/[^a-z0-9]/g, ''), []);
+
+  // Lock to prevent red dot "resurrection" during marking read
+  const markingReadRef = useRef(new Set())
 
   const translations = useMemo(() => ({
     en: {
@@ -469,7 +472,7 @@ export const MarketplaceProvider = ({ children }) => {
     }
   }
 
-  const fetchConversations = async (userId) => {
+  const fetchConversations = useCallback(async (userId) => {
     // This is a simplified fetch. In a real app, you might join with profiles/products.
     // For now, we assume 'conversations' table has cached info or we fetch it.
     try {
@@ -490,7 +493,7 @@ export const MarketplaceProvider = ({ children }) => {
       if (data) {
         const mapped = data.map(c => {
           const isBuyer = c.buyer_id === userId
-          const otherName = isBuyer ? c.seller_name : c.buyer_name // Assuming these fields exist for simplicity
+          const otherName = isBuyer ? c.seller_name : c.buyer_name
           const lastReadAt = isBuyer ? c.buyer_last_read_at : c.seller_last_read_at
           const lastReadTime = lastReadAt ? new Date(lastReadAt).getTime() : 0
 
@@ -503,7 +506,7 @@ export const MarketplaceProvider = ({ children }) => {
             productId: c.product_id,
             productTitle: c.product_title,
             productImage: c.product_image,
-            sellerName: otherName || 'User', // Display name of the other party
+            sellerName: otherName || 'User',
             messages: c.messages.map(m => ({
               id: m.id,
               text: m.content,
@@ -512,7 +515,8 @@ export const MarketplaceProvider = ({ children }) => {
             })).sort((a, b) => a.timestamp - b.timestamp),
             lastMessage: c.last_message,
             lastTimestamp: new Date(c.updated_at).getTime(),
-            unreadCount: unreadMsgs.length
+            // 🟢 Fix: respect the marking-read lock to prevent red dot resurrection
+            unreadCount: markingReadRef.current.has(c.id) ? 0 : unreadMsgs.length
           }
         })
         setConversations(mapped)
@@ -520,7 +524,7 @@ export const MarketplaceProvider = ({ children }) => {
     } catch (err) {
       console.error('Error fetching conversations:', err)
     }
-  }
+  }, [])
 
   const addListing = async ({ title, price, images, description, whatsapp, wechat, instagram, locationName, lat, lng, category, tags = [], currency = 'MYR' }) => {
     if (!session?.user) {
@@ -776,17 +780,16 @@ export const MarketplaceProvider = ({ children }) => {
   }
 
   // 标记会话已读
-  const markConversationRead = async (conversationId) => {
+  const markConversationRead = useCallback(async (conversationId) => {
     if (!session?.user) return
     try {
+      // 🟢 Fix: Add to lock set to prevent red dot resurrection
+      markingReadRef.current.add(conversationId)
+
       // Optimistic UI Update: 立即在本地清除未读数，让小红点瞬间消失
       setConversations(prev => prev.map(c =>
         c.id === conversationId ? { ...c, unreadCount: 0 } : c
       ))
-
-      // 判断当前用户是买家还是卖家
-      const conv = conversations.find(c => c.id === conversationId)
-      if (!conv) return
 
       const { data: convData } = await supabase
         .from('conversations')
@@ -803,16 +806,20 @@ export const MarketplaceProvider = ({ children }) => {
         .from('conversations')
         .update({ [field]: new Date().toISOString() })
         .eq('id', conversationId)
+
+      // Release lock after DB confirmed
+      markingReadRef.current.delete(conversationId)
     } catch (err) {
       console.error('Error marking conversation read:', err)
+      markingReadRef.current.delete(conversationId)
     }
-  }
+  }, [session])
 
 
-  const logoutUser = async () => {
+  const logoutUser = useCallback(async () => {
     await supabase.auth.signOut()
     // State clearing is handled by onAuthStateChange
-  }
+  }, [])
 
   // setUserAvatar 已移除，头像上传统一使用 uploadAvatar(file)
 
@@ -857,7 +864,7 @@ export const MarketplaceProvider = ({ children }) => {
   }
 
   // 3.6 举报功能
-  const reportContent = async (type, targetId, reason, details = '') => {
+  const reportContent = useCallback(async (type, targetId, reason, details = '') => {
     if (!session?.user) {
       showToast('error', language === 'zh' ? '请先登录' : 'Please login first')
       return
@@ -870,7 +877,25 @@ export const MarketplaceProvider = ({ children }) => {
       details
     })
     if (error) throw error
-  }
+  }, [session, language, showToast])
+
+  // 删除会话
+  const deleteConversation = useCallback(async (conversationId) => {
+    if (!session?.user) return
+    try {
+      // 先删除该会话下所有消息
+      await supabase.from('messages').delete().eq('conversation_id', conversationId)
+      // 再删除会话本身
+      const { error } = await supabase.from('conversations').delete().eq('id', conversationId)
+      if (error) throw error
+      // Optimistic: 立即从本地状态移除
+      setConversations(prev => prev.filter(c => c.id !== conversationId))
+      showToast('success', language === 'zh' ? '会话已删除' : 'Conversation deleted')
+    } catch (err) {
+      console.error('Error deleting conversation:', err)
+      showToast('error', language === 'zh' ? '删除失败' : 'Failed to delete')
+    }
+  }, [session, language, showToast])
 
   const sendMessage = async (conversationId, text) => {
     if (!session?.user) return
@@ -1021,6 +1046,7 @@ export const MarketplaceProvider = ({ children }) => {
     startConversation,
     markConversationRead,
     fetchConversations,
+    deleteConversation,
     userLocation,
     setUserLocation,
     // 3.1 Loading
@@ -1032,7 +1058,11 @@ export const MarketplaceProvider = ({ children }) => {
     // 3.6 Report
     reportContent,
     unreadCount
-  }), [listings, favorites, language, user, session, locations, normalize, conversations, userLocation, loading, toast, unreadCount])
+  }), [listings, favorites, language, user, session, uniqueLocations, conversations, userLocation, loading, toast, unreadCount,
+    // useCallback-stabilized functions (won't cause extra re-renders)
+    addListing, updateListing, deleteListing, toggleFavorite, toggleLanguage, logoutUser,
+    normalize, sendMessage, startConversation, markConversationRead, fetchConversations,
+    deleteConversation, reportContent, showToast, clearToast, translations])
   return <MarketplaceContext.Provider value={value}>{children}</MarketplaceContext.Provider>
 }
 

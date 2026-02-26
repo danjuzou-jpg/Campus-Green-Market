@@ -122,7 +122,7 @@ const Profile = () => {
     <div className="bg-white/80 backdrop-blur-sm rounded-[2rem] p-3 shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-white/60 relative group flex flex-col h-full hover:shadow-[0_12px_30px_rgba(0,0,0,0.06)] transition-all duration-300">
       <Link to={`/product/${item.id}`} className="block flex-1 flex flex-col">
         <div className="w-full aspect-square rounded-2xl overflow-hidden bg-slate-50 relative mb-3">
-          <img src={item.imageUrl} alt={item.title} className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
+          <img src={item.imageUrl} alt={item.title} loading="lazy" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" />
         </div>
         <div className="flex flex-col flex-1 px-1">
           <div className="text-[13px] text-slate-800 font-bold leading-snug line-clamp-2 mb-1.5">{item.title}</div>

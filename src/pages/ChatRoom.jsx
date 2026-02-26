@@ -49,7 +49,8 @@ const ChatRoom = () => {
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
-  }, [id, session, fetchConversations])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [id, session?.user?.id])
 
   if (!conv) return <div className="p-4">{t.noMessages}</div>
 

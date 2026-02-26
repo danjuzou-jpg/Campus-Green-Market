@@ -1,13 +1,24 @@
-import React from 'react'
+import React, { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useMarketplace } from '../context/MarketplaceContext'
-import { MessageSquare, ChevronRight, ArrowLeft } from 'lucide-react'
+import { MessageSquare, ChevronRight, ArrowLeft, Trash2 } from 'lucide-react'
 import { SkeletonInbox } from '../components/Skeleton.jsx'
 
 const Inbox = () => {
-  const { conversations, language, translations, loading } = useMarketplace()
+  const { conversations, language, translations, loading, deleteConversation } = useMarketplace()
   const t = translations[language]
   const navigate = useNavigate()
+  const [deletingId, setDeletingId] = useState(null)
+
+  const handleDelete = async (e, convId) => {
+    e.stopPropagation() // Prevent navigating to the chat room
+    if (deletingId) return // Prevent double-clicks
+    const confirmMsg = language === 'zh' ? '确定要删除这个会话吗？所有聊天记录都将被清除。' : 'Delete this conversation? All messages will be permanently removed.'
+    if (!window.confirm(confirmMsg)) return
+    setDeletingId(convId)
+    await deleteConversation(convId)
+    setDeletingId(null)
+  }
 
   return (
     <div className="mx-auto max-w-2xl min-h-screen pb-20 relative">
@@ -36,36 +47,53 @@ const Inbox = () => {
         ) : (
           <div className="bg-white/80 backdrop-blur-xl rounded-[2.5rem] p-3 shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-white/60 flex flex-col gap-2">
             {conversations.map((conv) => (
-              <button
+              <div
                 key={conv.id}
-                onClick={() => navigate(`/chat/${conv.id}`)}
-                className="w-full flex items-center gap-4 p-3 bg-white/40 hover:bg-white rounded-3xl transition-all active:scale-95 text-left border border-white/30 shadow-sm"
+                className="relative group"
               >
-                <div className="w-16 h-16 rounded-[1.2rem] overflow-hidden bg-slate-50 shrink-0 border border-slate-100 shadow-sm">
-                  <img src={conv.productImage} alt="" className="w-full h-full object-cover" />
-                </div>
-                <div className="flex-1 min-w-0 pr-1">
-                  <div className="flex justify-between items-baseline mb-1">
-                    <span className="font-black text-slate-800 text-[15px] truncate">{conv.sellerName}</span>
-                    <span className="text-[11px] font-bold text-slate-400">
-                      {new Date(conv.lastTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-                    </span>
+                <button
+                  onClick={() => navigate(`/chat/${conv.id}`)}
+                  className="w-full flex items-center gap-4 p-3 bg-white/40 hover:bg-white rounded-3xl transition-all active:scale-95 text-left border border-white/30 shadow-sm"
+                >
+                  <div className="w-16 h-16 rounded-[1.2rem] overflow-hidden bg-slate-50 shrink-0 border border-slate-100 shadow-sm">
+                    <img src={conv.productImage} alt="" className="w-full h-full object-cover" loading="lazy" />
                   </div>
-                  <div className="text-[13px] text-teal-600 font-bold truncate mb-1">{conv.productTitle}</div>
-                  <div className={`text-[13px] truncate ${conv.unreadCount > 0 ? 'font-bold text-slate-800' : 'font-medium text-slate-500'}`}>
-                    {conv.lastMessage || t.tapToChat}
+                  <div className="flex-1 min-w-0 pr-1">
+                    <div className="flex justify-between items-baseline mb-1">
+                      <span className="font-black text-slate-800 text-[15px] truncate">{conv.sellerName}</span>
+                      <span className="text-[11px] font-bold text-slate-400">
+                        {new Date(conv.lastTimestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                      </span>
+                    </div>
+                    <div className="text-[13px] text-teal-600 font-bold truncate mb-1">{conv.productTitle}</div>
+                    <div className={`text-[13px] truncate ${conv.unreadCount > 0 ? 'font-bold text-slate-800' : 'font-medium text-slate-500'}`}>
+                      {conv.lastMessage || t.tapToChat}
+                    </div>
                   </div>
-                </div>
-                {conv.unreadCount > 0 ? (
-                  <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center shrink-0 shadow-sm shadow-red-200">
-                    <span className="text-white text-[10px] font-bold">{conv.unreadCount > 99 ? '99+' : conv.unreadCount}</span>
-                  </div>
-                ) : (
-                  <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center shrink-0">
-                    <ChevronRight size={16} className="text-slate-400" />
-                  </div>
-                )}
-              </button>
+                  {conv.unreadCount > 0 ? (
+                    <div className="w-6 h-6 rounded-full bg-red-500 flex items-center justify-center shrink-0 shadow-sm shadow-red-200">
+                      <span className="text-white text-[10px] font-bold">{conv.unreadCount > 99 ? '99+' : conv.unreadCount}</span>
+                    </div>
+                  ) : (
+                    <div className="w-8 h-8 rounded-full bg-slate-50 flex items-center justify-center shrink-0">
+                      <ChevronRight size={16} className="text-slate-400" />
+                    </div>
+                  )}
+                </button>
+                {/* Delete button — appears on hover (desktop) or always visible on mobile */}
+                <button
+                  onClick={(e) => handleDelete(e, conv.id)}
+                  disabled={deletingId === conv.id}
+                  className="absolute top-2 right-2 w-7 h-7 rounded-full bg-red-50 text-red-400 hover:bg-red-500 hover:text-white flex items-center justify-center opacity-0 group-hover:opacity-100 transition-all duration-200 md:opacity-0 active:scale-90 z-10"
+                  title={language === 'zh' ? '删除会话' : 'Delete conversation'}
+                >
+                  {deletingId === conv.id ? (
+                    <div className="w-3.5 h-3.5 border-2 border-red-300 border-t-red-500 rounded-full animate-spin" />
+                  ) : (
+                    <Trash2 size={13} />
+                  )}
+                </button>
+              </div>
             ))}
           </div>
         )}

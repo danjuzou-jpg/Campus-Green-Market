@@ -92,7 +92,7 @@ const ProductDetail = () => {
                 <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-hide md:justify-center">
                   {images.map((img, idx) => (
                     <button key={idx} onClick={() => setActiveImageIdx(idx)} className={`w-14 h-14 md:w-16 md:h-16 rounded-xl border-2 overflow-hidden flex-shrink-0 transition-all ${activeImageIdx === idx ? 'border-emerald-500 shadow-lg scale-105' : 'border-transparent bg-gray-100 opacity-70 hover:opacity-100'}`}>
-                      <img src={img} alt="" className="w-full h-full object-cover" />
+                      <img src={img} alt="" loading="lazy" className="w-full h-full object-cover" />
                     </button>
                   ))}
                 </div>
