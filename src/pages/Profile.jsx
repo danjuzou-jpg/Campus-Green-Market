@@ -133,9 +133,11 @@ const Profile = () => {
 
   const handleDelete = async (id) => {
     if (window.confirm(t.confirmDelete)) {
-      await deleteProduct(id)
-      setMyListings(prev => prev.filter(l => l.id !== id))
-      setFavoriteItems(prev => prev.filter(l => l.id !== id))
+      const success = await deleteProduct(id)
+      if (success) {
+        setMyListings(prev => prev.filter(l => l.id !== id))
+        setFavoriteItems(prev => prev.filter(l => l.id !== id))
+      }
     }
   }
 

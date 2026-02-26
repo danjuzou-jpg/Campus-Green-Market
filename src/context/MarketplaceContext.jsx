@@ -683,16 +683,39 @@ export const MarketplaceProvider = ({ children }) => {
   }, [session, language, showToast])
 
   const deleteListing = useCallback(async (id) => {
+    if (!session?.user) {
+      showToast('error', language === 'zh' ? '请先登录' : 'Please login first')
+      return false
+    }
     try {
-      const { error } = await supabase.from('products').delete().eq('id', id)
+      // 先删除 Storage 中的图片
+      const product = listings.find(l => l.id === id)
+      if (product) {
+        const imageUrls = product.imageUrls || (product.imageUrl ? [product.imageUrl] : [])
+        for (const url of imageUrls) {
+          if (!url) continue
+          const fileName = url.substring(url.lastIndexOf('/') + 1)
+          if (fileName) {
+            await supabase.storage.from('product-images').remove([fileName])
+          }
+        }
+      }
+
+      const { error } = await supabase
+        .from('products')
+        .delete()
+        .eq('id', id)
+        .eq('owner_id', session.user.id) // RLS 额外保障，与 updateListing 一致
       if (error) throw error
       setListings(prev => prev.filter(l => l.id !== id))
       showToast('success', language === 'zh' ? '商品已删除' : 'Item deleted')
+      return true
     } catch (err) {
       console.error('Error deleting:', err)
       showToast('error', language === 'zh' ? '删除失败' : 'Failed to delete')
+      return false
     }
-  }, [language, showToast])
+  }, [session, language, showToast, listings])
 
   const deleteProduct = useCallback((id) => deleteListing(id), [deleteListing])
 
