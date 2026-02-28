@@ -32,39 +32,35 @@ export const MarketplaceProvider = ({ children }) => {
     verificationStatus: 'unverified',
     avatar: 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&q=80'
   })
-  const [locations, setLocations] = useState(['All Locations'])
+  const POPULAR_LOCATIONS = [
+    'All Locations',
+    'Ryan & Miho',
+    'Jaya One',
+    'Pacific Tower',
+    'Seventeen Residence',
+    'PJ Midtown',
+    'South Link',
+    'Southview',
+    'KL Gateway',
+    '线上'
+  ]
 
-  // 从 DB 动态获取所有地点
+  const [locations, setLocations] = useState(POPULAR_LOCATIONS)
+
+  // 从 DB 动态获取所有地点 (现已简化为静态官方位置列表)
   const fetchLocations = useCallback(async () => {
-    try {
-      const { data, error } = await supabase
-        .from('products')
-        .select('location_name')
-        .not('location_name', 'is', null)
-        .not('location_name', 'eq', '')
-      if (data) {
-        let names = [...new Set(data.map(d => d.location_name).filter(Boolean))]
-        // 将"线上"地点单独提取出来放在最后
-        const hasOnline = names.includes('线上')
-        names = names.filter(n => n !== '线上').sort()
-        if (hasOnline) {
-          names.push('线上')
-        }
-        setLocations(['All Locations', ...names])
-      }
-    } catch (err) {
-      console.warn('Error fetching locations:', err)
-    }
+    // 不再动态请求，避免用户乱填的位置污染首页侧拉分类栏。
   }, [])
 
   // Ensure locations are unique
-  const uniqueLocations = useMemo(() => [...new Set(locations)], [locations])
+  const uniqueLocations = useMemo(() => POPULAR_LOCATIONS, [])
 
   const [conversations, setConversations] = useState([])
   const [userLocation, setUserLocation] = useState(null)
 
   // ── 3.1 Loading 状态 ──
   const [loading, setLoading] = useState({ products: true, profile: false })
+  const [authLoading, setAuthLoading] = useState(true)
 
   // ── 3.2 Toast 通知状态 ──
   const [toast, setToast] = useState(null)
@@ -175,7 +171,8 @@ export const MarketplaceProvider = ({ children }) => {
       // 商品详情
       saved: 'Saved',
       addToFavorites: 'Add to Favorites',
-      wechatCopied: 'WeChat ID Copied',
+      wechatCopied: 'WeChat ID copied to clipboard. Please paste in WeChat to add.',
+      whatsappRedirect: 'WhatsApp ID copied to clipboard. Redirecting to WhatsApp...',
       viewItem: 'View Item',
       // 个人中心
       myInbox: 'My Inbox',
@@ -300,7 +297,8 @@ export const MarketplaceProvider = ({ children }) => {
       // 商品详情
       saved: '已收藏',
       addToFavorites: '收藏',
-      wechatCopied: '微信号已复制',
+      wechatCopied: '微信号已复制到剪贴板，请在微信粘贴使用粘贴添加',
+      whatsappRedirect: 'WhatsApp账号已复制到剪贴板，即将直接跳转到whatsapp页面',
       viewItem: '查看商品',
       // 个人中心
       myInbox: '我的消息',
@@ -341,9 +339,9 @@ export const MarketplaceProvider = ({ children }) => {
         fetchProfile(session.user.id)
         fetchFavorites(session.user.id)
         fetchConversations(session.user.id)
-        fetchProducts(session.user.id)
+        fetchProducts(session.user.id).finally(() => setAuthLoading(false))
       } else {
-        fetchProducts(null)
+        fetchProducts(null).finally(() => setAuthLoading(false))
       }
     })
 
@@ -527,7 +525,14 @@ export const MarketplaceProvider = ({ children }) => {
         console.warn('RPC failed, falling back to basic query', error)
         let q = supabase.from('products').select('*').order('created_at', { ascending: false }).range((page - 1) * limit, page * limit - 1)
         if (categoryFilter !== 'All') q = q.eq('category', categoryFilter)
-        if (searchTerm) q = q.or(`title.ilike.%${searchTerm}%,description.ilike.%${searchTerm}%`)
+
+        // Multi-keyword fuzzy search fallback
+        if (searchTerm) {
+          const keywords = searchTerm.trim().split(/\s+/).filter(Boolean)
+          keywords.forEach(kw => {
+            q = q.or(`title.ilike.%${kw}%,description.ilike.%${kw}%,location_name.ilike.%${kw}%`)
+          })
+        }
 
         const { data: fallbackData, error: fbError } = await q
         if (fbError) throw fbError
@@ -714,11 +719,16 @@ export const MarketplaceProvider = ({ children }) => {
       return false
     }
     try {
-      // 先删除 Storage 中的图片
-      const product = listings.find(l => l.id === id)
-      if (product) {
-        const imageUrls = product.imageUrls || (product.imageUrl ? [product.imageUrl] : [])
-        for (const url of imageUrls) {
+      // 1. 强制从数据库直接获取当前商品的最新图片列表 (不受前端组件状态影响)
+      const { data: productData, error: fetchError } = await supabase
+        .from('products')
+        .select('images')
+        .eq('id', id)
+        .single()
+
+      // 2. 遍历删除 Storage 中的文件
+      if (!fetchError && productData?.images?.length) {
+        for (const url of productData.images) {
           if (!url) continue
           const fileName = url.substring(url.lastIndexOf('/') + 1)
           if (fileName) {

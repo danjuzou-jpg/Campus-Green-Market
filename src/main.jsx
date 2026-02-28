@@ -34,8 +34,16 @@ import ErrorBoundary from './components/ErrorBoundary.jsx'
 
 // 路由守卫：需要登录才能访问的页面
 const RequireAuth = ({ children }) => {
-  const { session } = useMarketplace()
+  const { session, authLoading } = useMarketplace()
   const location = useLocation()
+
+  if (authLoading) {
+    return (
+      <div className="flex items-center justify-center min-h-[60vh]">
+        <div className="w-8 h-8 border-4 border-teal-500/30 border-t-teal-500 rounded-full animate-spin"></div>
+      </div>
+    )
+  }
 
   if (!session) {
     // 保存用户想去的页面，登录后可以跳回
@@ -48,16 +56,14 @@ const RequireAuth = ({ children }) => {
 const AppContent = () => {
   const navigate = useNavigate()
   const location = useLocation()
-  const { session } = useMarketplace()
+  const { session, authLoading } = useMarketplace()
 
   useEffect(() => {
-    const hasVisited = localStorage.getItem('hasVisited')
-    if (!hasVisited && location.pathname !== '/welcome' && location.pathname !== '/auth') {
-      navigate('/welcome')
-    } else if (hasVisited && location.pathname === '/') {
-      navigate('/home')
+    if (authLoading) return // Do not redirect while checking session
+    if (location.pathname === '/') {
+      navigate('/home', { replace: true })
     }
-  }, [navigate, location.pathname])
+  }, [navigate, location.pathname, authLoading])
 
   return (
     <Routes>

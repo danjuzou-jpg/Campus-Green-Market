@@ -73,14 +73,74 @@ const Home = () => {
   const handleSearch = (e) => {
     if (e.key === 'Enter') {
       const q = term.trim()
-      if (!q) return
+
+      if (!q) {
+        setAppliedTerm('')
+        return
+      }
+
       // 识别 UUID 格式 → 跳转用户主页
       if (UUID_REGEX.test(q)) {
         navigate(`/user/${q}`)
         return
       }
+
+      // 提取符合系统字典的地点 (支持别名模糊匹配)
+      const LOCATION_ALIASES = {
+        'ryan': 'Ryan & Miho',
+        'miho': 'Ryan & Miho',
+        'jaya': 'Jaya One',
+        'pacific': 'Pacific Tower',
+        'seventeen': 'Seventeen Residence',
+        '17': 'Seventeen Residence',
+        'midtown': 'PJ Midtown',
+        'pj': 'PJ Midtown',
+        'south link': 'South Link',
+        'southlink': 'South Link',
+        'southview': 'Southview',
+        'south view': 'Southview',
+        'kl gateway': 'KL Gateway',
+        'gateway': 'KL Gateway',
+        'um library': 'UM Library',
+        'library': 'UM Library',
+        '线上': '线上',
+        'online': '线上'
+      };
+
+      let processedTerm = q;
+      let lowerQ = q.toLowerCase();
+      let foundOfficialLoc = null;
+      let matchedAlias = null;
+
+      // 首先尝试全称匹配
+      const exactLoc = locations.find(loc => loc !== 'All Locations' && lowerQ.includes(loc.toLowerCase()));
+      if (exactLoc) {
+        foundOfficialLoc = exactLoc;
+        matchedAlias = exactLoc;
+      } else {
+        // 全称没中，尝试使用常见别名匹配
+        for (const [alias, officialStr] of Object.entries(LOCATION_ALIASES)) {
+          // 为了防止如 'pj' 匹配到单词里的一小截，最好加上简单的边界要求，但考虑到用户瞎敲，直接includes通常对这种短搜容错最高
+          if (lowerQ.includes(alias)) {
+            if (locations.includes(officialStr)) {
+              foundOfficialLoc = officialStr;
+              matchedAlias = alias;
+              break;
+            }
+          }
+        }
+      }
+
+      if (foundOfficialLoc && matchedAlias) {
+        // 把提取出来的地点别名从关键词里剥离 (安全处理特殊字符 Regex)
+        const escapeRegExp = string => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+        const regex = new RegExp(escapeRegExp(matchedAlias), 'i');
+        processedTerm = processedTerm.replace(regex, '').trim();
+        setActiveLoc(foundOfficialLoc);
+      }
+
       saveSearchTerm(q)
-      setAppliedTerm(q)
+      setAppliedTerm(processedTerm)
       setShowSearchPanel(false)
     }
   }
@@ -171,16 +231,34 @@ const Home = () => {
           <Menu size={20} />
         </button>
 
-        <div className="flex-1 bg-white/80 backdrop-blur-md shadow-sm border border-white/50 rounded-full flex items-center px-4 py-3 transition-shadow focus-within:shadow-md focus-within:bg-white">
-          <Search size={18} className="text-slate-400 mr-2 shrink-0" />
+        <div className="flex-1 bg-white/80 backdrop-blur-md shadow-sm border border-white/50 rounded-full flex items-center px-4 py-3 transition-shadow focus-within:shadow-md focus-within:bg-white relative">
+          <Search
+            size={18}
+            className="text-slate-400 mr-2 shrink-0 cursor-pointer hover:text-teal-600 transition-colors"
+            onClick={() => handleSearch({ key: 'Enter' })}
+          />
           <input
             type="text"
             value={term}
-            onChange={e => setTerm(e.target.value)}
+            onChange={e => {
+              const val = e.target.value;
+              setTerm(val);
+              if (val.trim() === '') {
+                setAppliedTerm('');
+              }
+            }}
             onKeyDown={handleSearch}
-            placeholder={language === 'zh' ? '搜索商品 / 输入用户ID' : 'Search items / User ID'}
-            className="bg-transparent border-none outline-none text-slate-700 placeholder-slate-400 font-bold text-[13px] w-full"
+            placeholder={language === 'zh' ? '搜索商品 / 输入地点或用户ID' : 'Search, Location or ID'}
+            className="bg-transparent border-none outline-none text-slate-700 placeholder-slate-400 font-bold text-[13px] w-full pr-8"
           />
+          {term && (
+            <button
+              onClick={() => { setTerm(''); setAppliedTerm(''); }}
+              className="absolute right-4 p-1 text-slate-400 hover:text-slate-600 rounded-full transition-colors"
+            >
+              <X size={16} />
+            </button>
+          )}
         </div>
       </div>
 
@@ -237,7 +315,13 @@ const Home = () => {
         <div className="relative shrink-0">
           <select
             value={distance}
-            onChange={(e) => setDistance(e.target.value)}
+            onChange={(e) => {
+              const val = e.target.value;
+              if (val !== 'Any' && !userLocation) {
+                handleGeoLocation();
+              }
+              setDistance(val);
+            }}
             className="appearance-none pl-4 pr-8 py-2.5 rounded-full text-xs font-bold bg-white text-slate-500 shadow-sm outline-none cursor-pointer focus:ring-2 focus:ring-teal-100 transition-all"
           >
             <option value="Any">{t.distanceAny}</option>

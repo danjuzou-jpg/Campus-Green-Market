@@ -64,10 +64,18 @@ BEGIN
         END AS distance_km
     FROM products p
     WHERE 
-        -- 1. Search Term
+        -- 1. Search Term (Multi-keyword Fuzzy Search)
         (search_term = '' OR 
-         p.title ILIKE '%' || search_term || '%' OR 
-         p.description ILIKE '%' || search_term || '%')
+         (
+             SELECT bool_and(
+                 p.title ILIKE '%' || kw || '%' OR 
+                 p.description ILIKE '%' || kw || '%' OR
+                 p.location_name ILIKE '%' || kw || '%'
+             )
+             FROM unnest(string_to_array(trim(search_term), ' ')) AS kw
+             WHERE kw <> ''
+         )
+        )
         
         -- 2. Category Filter
         AND (category_filter = 'All' OR p.category = category_filter)

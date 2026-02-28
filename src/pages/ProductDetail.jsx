@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useMarketplace } from '../context/MarketplaceContext.jsx'
-import { MapPin, Phone, MessageSquare, Heart, Lock, Edit3, Flag, ExternalLink } from 'lucide-react'
+import { MapPin, Phone, MessageSquare, Heart, Lock, Edit3, Flag, ExternalLink, ChevronRight } from 'lucide-react'
+import { supabase } from '../lib/supabaseClient'
 import { SkeletonDetail } from '../components/Skeleton.jsx'
 import ReportModal from '../components/ReportModal.jsx'
 
@@ -29,6 +30,20 @@ const ProductDetail = () => {
   // Hooks must be called before any conditional returns (React Rules of Hooks)
   const [showReport, setShowReport] = useState(false)
   const [activeImageIdx, setActiveImageIdx] = useState(0)
+  const [sellerProfile, setSellerProfile] = useState(null)
+
+  useEffect(() => {
+    if (item?.owner_id) {
+      supabase
+        .from('profiles')
+        .select('full_name, avatar_url, school')
+        .eq('id', item.owner_id)
+        .single()
+        .then(({ data }) => {
+          if (data) setSellerProfile(data)
+        })
+    }
+  }, [item?.owner_id])
 
   if (loadingItem) return <SkeletonDetail />
   if (!item) return <div className="mx-auto max-w-md px-4 pt-4">{t.noItemsFound}</div>
@@ -64,16 +79,21 @@ const ProductDetail = () => {
     }
   }
 
-  const openWhatsApp = () => {
+  const openWhatsApp = async () => {
     const text = encodeURIComponent(`Hi, I'm interested in: ${item.title}`)
     const number = item.whatsapp || item.contact || ''
-    if (number) window.open(`https://wa.me/${number}?text=${text}`, '_blank')
+    if (!number) return
+    try { await navigator.clipboard.writeText(number) } catch { }
+    showToast('success', t.whatsappRedirect)
+    setTimeout(() => {
+      window.open(`https://wa.me/${number}?text=${text}`, '_blank')
+    }, 1500)
   }
   const copyWeChat = async () => {
     const wid = item.wechat || ''
     if (!wid) return
     try { await navigator.clipboard.writeText(wid) } catch { }
-    showToast('success', t.wechatCopied)
+    showToast('success', t.wechatCopied || (language === 'zh' ? '微信号已复制到剪贴板，请在微信粘贴使用粘贴添加' : 'WeChat ID copied to clipboard. Please paste in WeChat to add.'))
   }
 
   return (
@@ -169,12 +189,36 @@ const ProductDetail = () => {
                 </div>
               )}
 
+              {/* Product Description */}
               <div className="pt-6 border-t border-slate-100">
                 <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">{t.productDesc}</h3>
                 <p className="text-[15px] font-medium text-slate-600 leading-relaxed whitespace-pre-line">
                   {item.description || t.noDescription}
                 </p>
               </div>
+
+              {/* Seller Profile Row */}
+              {sellerProfile && (
+                <div
+                  onClick={() => navigate(`/user/${item.owner_id}`)}
+                  className="pt-6 border-t border-slate-100 cursor-pointer group"
+                >
+                  <div className="flex items-center justify-between p-4 rounded-2xl bg-slate-50 border border-slate-100 transition-all group-hover:bg-teal-50 group-hover:border-teal-100">
+                    <div className="flex items-center gap-4">
+                      <div className="w-12 h-12 rounded-full overflow-hidden border-2 border-white shadow-sm shrink-0">
+                        <img src={sellerProfile.avatar_url || 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&q=80'} alt="Seller Avatar" className="w-full h-full object-cover" />
+                      </div>
+                      <div className="flex flex-col">
+                        <span className="text-[14px] font-bold text-slate-800 leading-tight">{sellerProfile.full_name}</span>
+                        <span className="text-[12px] text-slate-500">{sellerProfile.school || 'Universiti Malaya (UM)'}</span>
+                      </div>
+                    </div>
+                    <div className="w-8 h-8 rounded-full bg-white flex items-center justify-center shadow-sm text-slate-400 group-hover:text-teal-600 transition-colors">
+                      <ChevronRight size={18} />
+                    </div>
+                  </div>
+                </div>
+              )}
 
               {/* Desktop Actions */}
               <div className="hidden md:block pt-8 border-t border-slate-100">
@@ -186,10 +230,12 @@ const ProductDetail = () => {
                         <span>{t.chat}</span>
                       </button>
                       <button onClick={openWhatsApp} disabled={!(item.whatsapp || item.contact)} className={`flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold border-2 transition-all ${item.whatsapp || item.contact ? 'border-green-500 text-green-600 hover:bg-green-50' : 'border-gray-100 text-gray-300 cursor-not-allowed'}`}>
-                        <Phone size={18} /> WhatsApp
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z" /></svg>
+                        WhatsApp
                       </button>
-                      <button onClick={copyWeChat} disabled={!item.wechat} className={`flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold border-2 transition-all ${item.wechat ? 'border-blue-500 text-blue-600 hover:bg-blue-50' : 'border-gray-100 text-gray-300 cursor-not-allowed'}`}>
-                        <MessageSquare size={18} /> WeChat
+                      <button onClick={copyWeChat} disabled={!item.wechat} className={`flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold border-2 transition-all ${item.wechat ? 'border-green-500 text-green-600 hover:bg-green-50' : 'border-gray-100 text-gray-300 cursor-not-allowed'}`}>
+                        <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8.497 2.1c4.542 0 8.225 3.125 8.225 6.98 0 3.854-3.683 6.98-8.225 6.98-1.503 0-2.913-.338-4.148-.936L1.134 16.96l1.246-3.877C.885 11.516 0 9.351 0 9.08c0-3.854 3.682-6.98 8.497-6.98Zm12.062 6.556c4.54 0 8.223 3.125 8.223 6.979 0 3.854-3.682 6.979-8.223 6.979-1.503 0-2.913-.338-4.147-.936l-3.216 1.836 1.246-3.877c-1.495-1.566-2.38-3.731-2.38-4.002 0-3.854 3.681-6.979 8.497-6.979Z" /></svg>
+                        WeChat
                       </button>
                     </>
                   ) : (
@@ -199,8 +245,14 @@ const ProductDetail = () => {
                         <span>{t.verifyToChat}</span>
                       </button>
                       <div className="flex gap-4 opacity-50 pointer-events-none grayscale">
-                        <button className="flex-1 flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold border-2 border-gray-100 text-gray-300"><Phone size={18} /> WhatsApp</button>
-                        <button className="flex-1 flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold border-2 border-gray-100 text-gray-300"><MessageSquare size={18} /> WeChat</button>
+                        <button className="flex-1 flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold border-2 border-gray-100 text-gray-300">
+                          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z" /></svg>
+                          WhatsApp
+                        </button>
+                        <button className="flex-1 flex items-center justify-center gap-2 rounded-xl py-3 text-sm font-bold border-2 border-gray-100 text-gray-300">
+                          <svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M8.497 2.1c4.542 0 8.225 3.125 8.225 6.98 0 3.854-3.683 6.98-8.225 6.98-1.503 0-2.913-.338-4.148-.936L1.134 16.96l1.246-3.877C.885 11.516 0 9.351 0 9.08c0-3.854 3.682-6.98 8.497-6.98Zm12.062 6.556c4.54 0 8.223 3.125 8.223 6.979 0 3.854-3.682 6.979-8.223 6.979-1.503 0-2.913-.338-4.147-.936l-3.216 1.836 1.246-3.877c-1.495-1.566-2.38-3.731-2.38-4.002 0-3.854 3.681-6.979 8.497-6.979Z" /></svg>
+                          WeChat
+                        </button>
                       </div>
                       <div className="text-center text-[10px] text-orange-500 font-bold bg-orange-50 py-2 rounded-lg">{t.verifyRequired}</div>
                     </div>
@@ -227,11 +279,11 @@ const ProductDetail = () => {
 
           {user.verificationStatus === 'verified' ? (
             <div className="flex items-center gap-2">
-              <button onClick={openWhatsApp} disabled={!(item.whatsapp || item.contact)} className={`w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-sm ${item.whatsapp || item.contact ? 'bg-teal-50 text-teal-600' : 'bg-slate-50 text-slate-300'}`}>
-                <Phone size={20} />
+              <button onClick={openWhatsApp} disabled={!(item.whatsapp || item.contact)} className={`w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-sm ${item.whatsapp || item.contact ? 'bg-green-50 text-green-600' : 'bg-slate-50 text-slate-300'}`}>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M17.472 14.382c-.297-.149-1.758-.867-2.03-.967-.273-.099-.471-.148-.67.15-.197.297-.767.966-.94 1.164-.173.199-.347.223-.644.075-.297-.15-1.255-.463-2.39-1.475-.883-.788-1.48-1.761-1.653-2.059-.173-.297-.018-.458.13-.606.134-.133.298-.347.446-.52.149-.174.198-.298.298-.497.099-.198.05-.371-.025-.52-.075-.149-.669-1.612-.916-2.207-.242-.579-.487-.5-.669-.51a12.8 12.8 0 0 0-.57-.01c-.198 0-.52.074-.792.372-.272.297-1.04 1.016-1.04 2.479 0 1.462 1.065 2.875 1.213 3.074.149.198 2.096 3.2 5.077 4.487.709.306 1.262.489 1.694.625.712.227 1.36.195 1.871.118.571-.085 1.758-.719 2.006-1.413.248-.694.248-1.289.173-1.413-.074-.124-.272-.198-.57-.347m-5.421 7.403h-.004a9.87 9.87 0 0 1-5.031-1.378l-.361-.214-3.741.982.998-3.648-.235-.374a9.86 9.86 0 0 1-1.51-5.26c.001-5.45 4.436-9.884 9.888-9.884 2.64 0 5.122 1.03 6.988 2.898a9.825 9.825 0 0 1 2.893 6.994c-.003 5.45-4.437 9.884-9.885 9.884m8.413-18.297A11.815 11.815 0 0 0 12.05 0C5.495 0 .16 5.335.157 11.892c0 2.096.547 4.142 1.588 5.945L.057 24l6.305-1.654a11.882 11.882 0 0 0 5.683 1.448h.005c6.554 0 11.89-5.335 11.893-11.893a11.821 11.821 0 0 0-3.48-8.413Z" /></svg>
               </button>
-              <button onClick={copyWeChat} disabled={!item.wechat} className={`w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-sm ${item.wechat ? 'bg-blue-50 text-blue-600' : 'bg-slate-50 text-slate-300'}`}>
-                <MessageSquare size={20} />
+              <button onClick={copyWeChat} disabled={!item.wechat} className={`w-12 h-12 rounded-full flex items-center justify-center transition-all active:scale-95 shadow-sm ${item.wechat ? 'bg-green-50 text-green-600' : 'bg-slate-50 text-slate-300'}`}>
+                <svg viewBox="0 0 24 24" width="20" height="20" fill="currentColor"><path d="M8.497 2.1c4.542 0 8.225 3.125 8.225 6.98 0 3.854-3.683 6.98-8.225 6.98-1.503 0-2.913-.338-4.148-.936L1.134 16.96l1.246-3.877C.885 11.516 0 9.351 0 9.08c0-3.854 3.682-6.98 8.497-6.98Zm12.062 6.556c4.54 0 8.223 3.125 8.223 6.979 0 3.854-3.682 6.979-8.223 6.979-1.503 0-2.913-.338-4.147-.936l-3.216 1.836 1.246-3.877c-1.495-1.566-2.38-3.731-2.38-4.002 0-3.854 3.681-6.979 8.497-6.979Z" /></svg>
               </button>
               <button onClick={handleChat} className="bg-[#00b478] hover:bg-[#009c69] text-white rounded-full px-8 py-3.5 font-bold shadow-[0_8px_20px_rgba(0,180,120,0.3)] active:scale-95 transition-all text-[15px]">
                 {t.chat}

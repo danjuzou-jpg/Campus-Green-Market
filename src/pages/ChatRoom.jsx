@@ -55,6 +55,20 @@ const ChatRoom = () => {
     }
   }, [conv?.messages])
 
+  // Viewport Height Fix for mobile keyboards
+  const [vpHeight, setVpHeight] = useState(window.innerHeight)
+  useEffect(() => {
+    const handleResize = () => {
+      setVpHeight(window.visualViewport ? window.visualViewport.height : window.innerHeight)
+    }
+    window.visualViewport?.addEventListener('resize', handleResize)
+    window.addEventListener('resize', handleResize)
+    return () => {
+      window.visualViewport?.removeEventListener('resize', handleResize)
+      window.removeEventListener('resize', handleResize)
+    }
+  }, [])
+
   // 标记已读（仅已存在的会话）
   useEffect(() => {
     if (id && !isNewConversation) markConversationRead(id)
@@ -121,11 +135,40 @@ const ChatRoom = () => {
     }
   }
 
+  const formatMessageTime = (ts) => {
+    if (!ts) return ''
+    const date = new Date(ts)
+    const now = new Date()
+
+    const isToday = date.getDate() === now.getDate() &&
+      date.getMonth() === now.getMonth() &&
+      date.getFullYear() === now.getFullYear()
+
+    const yesterday = new Date(now)
+    yesterday.setDate(now.getDate() - 1)
+
+    const isYesterday = date.getDate() === yesterday.getDate() &&
+      date.getMonth() === yesterday.getMonth() &&
+      date.getFullYear() === yesterday.getFullYear()
+
+    const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })
+
+    if (isToday) return timeStr
+    if (isYesterday) return language === 'zh' ? `昨天 ${timeStr}` : `Yesterday ${timeStr}`
+
+    const month = (date.getMonth() + 1).toString().padStart(2, '0')
+    const day = date.getDate().toString().padStart(2, '0')
+    return `${month}/${day} ${timeStr}`
+  }
+
   return (
-    <div className="mx-auto max-w-2xl h-screen h-[100dvh] flex flex-col bg-gray-50 fixed inset-0 z-[60]">
+    <div
+      className="mx-auto max-w-2xl flex flex-col bg-gray-50 fixed inset-0 z-[60] md:relative md:inset-auto md:h-[85vh] md:rounded-3xl md:shadow-2xl md:overflow-hidden md:border md:border-gray-200"
+      style={{ height: window.innerWidth < 768 ? vpHeight : 'auto' }}
+    >
       {/* Header */}
-      <div className="bg-white border-b px-4 py-3 flex items-center gap-3 shrink-0">
-        <button onClick={() => navigate(-1)} className="p-1 -ml-1">
+      <div className="bg-white px-4 py-3 flex items-center gap-3 shrink-0 shadow-sm z-10">
+        <button onClick={() => navigate(-1)} className="p-1 -ml-1 text-gray-500 hover:bg-gray-100 rounded-full transition-colors">
           <ChevronLeft size={24} />
         </button>
         <div
@@ -177,7 +220,7 @@ const ChatRoom = () => {
               }`}>
               {msg.text}
               <div className={`text-[10px] mt-1 ${msg.sender === 'me' ? 'text-indigo-200' : 'text-gray-400'}`}>
-                {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                {formatMessageTime(msg.timestamp)}
               </div>
             </div>
           </div>
@@ -196,11 +239,17 @@ const ChatRoom = () => {
       {/* Input — 使用 max() 正确处理安全区域 */}
       <form
         onSubmit={handleSend}
-        className="bg-white border-t px-4 pt-4 flex gap-2 shrink-0"
+        className="bg-white border-t px-4 pt-4 flex gap-2 shrink-0 z-10"
         style={{ paddingBottom: 'max(1rem, env(safe-area-inset-bottom, 0.5rem))' }}
       >
         <input
+          name="chat_message_input"
+          id="chat_message_input"
           type="text"
+          autoComplete="off"
+          autoCorrect="off"
+          autoCapitalize="sentences"
+          spellCheck="false"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
           placeholder={t.typeMessage}

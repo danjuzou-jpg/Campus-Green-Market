@@ -274,6 +274,20 @@ const Profile = () => {
         </div>
       </div>
 
+      {/* User ID */}
+      <div className="px-4 mt-4">
+        <div className="bg-white/80 backdrop-blur-xl rounded-[2rem] px-6 py-4 shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-white/60 flex items-center justify-between">
+          <div>
+            <div className="text-[10px] font-black text-slate-400 uppercase tracking-wider mb-1">
+              {language === 'zh' ? '用户 ID' : 'User ID'}
+            </div>
+            <div className="text-xs font-mono text-slate-500 break-all select-all">
+              {session?.user?.id}
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Area B: Menu List */}
       <div className="px-4 mt-6">
         <div className="bg-white/80 backdrop-blur-xl rounded-[2rem] p-3 shadow-[0_8px_20px_rgba(0,0,0,0.03)] border border-white/60 space-y-2">
