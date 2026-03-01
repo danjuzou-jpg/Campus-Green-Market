@@ -6,7 +6,7 @@ import { compressImage } from '../lib/imageUtils.js'
 import { LoadingButton } from '../components/LoadingSpinner.jsx'
 
 const Upload = () => {
-  const { addListing, categories, language, translations, addLocation, locations, normalize, showToast } = useMarketplace()
+  const { addListing, categories, language, translations, locations, normalize, showToast } = useMarketplace()
   const t = translations[language]
   const navigate = useNavigate()
   const [images, setImages] = useState([])
@@ -73,7 +73,6 @@ const Upload = () => {
         locationName: finalLocationName, lat: latlng?.lat, lng: latlng?.lng, category, tags, currency
       })
       if (id) {
-        addLocation(finalLocationName)
         navigate(`/product/${id}`)
       }
     } catch (err) {
