@@ -4,7 +4,7 @@ import react from '@vitejs/plugin-react'
 export default defineConfig({
   plugins: [react()],
   esbuild: {
-    // 生产构建时自动移除 console.log / console.warn
-    drop: process.env.NODE_ENV === 'production' ? ['console', 'debugger'] : []
+    // 构建时始终移除 console / debugger（开发服务器会忽略 esbuild.drop）
+    drop: ['console', 'debugger']
   }
 })

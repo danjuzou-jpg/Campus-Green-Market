@@ -102,4 +102,6 @@ BEGIN
     LIMIT page_limit
     OFFSET page_offset;
 END;
-$$ LANGUAGE plpgsql SECURITY DEFINER;
+-- 安全修复 (P2-5): 改为 SECURITY INVOKER，函数以调用者身份执行，
+-- 尊重调用者的 RLS 策略，防止将来的 RLS 状态过滤（如隐藏下架商品）被绕过。
+$$ LANGUAGE plpgsql SECURITY INVOKER;

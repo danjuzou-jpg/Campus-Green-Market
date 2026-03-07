@@ -12,6 +12,20 @@
  */
 export const compressImage = (file, maxWidth = 1200, quality = 0.8) => {
     return new Promise((resolve, reject) => {
+        // 文件类型白名单校验（防止 SVG 等危险格式绕过 accept 属性）
+        const ALLOWED_TYPES = ['image/jpeg', 'image/png', 'image/webp']
+        if (!ALLOWED_TYPES.includes(file.type)) {
+            reject(new Error(`Unsupported file type: ${file.type}. Only JPEG, PNG and WebP are allowed.`))
+            return
+        }
+
+        // 5MB 硬限制（压缩前拒绝超大文件，防止移动端崩溃）
+        const MAX_SIZE_BYTES = 5 * 1024 * 1024
+        if (file.size > MAX_SIZE_BYTES) {
+            reject(new Error(`File too large (${(file.size / 1024 / 1024).toFixed(1)}MB). Maximum allowed size is 5MB.`))
+            return
+        }
+
         // 如果文件小于 500KB，不压缩
         if (file.size < 500 * 1024) {
             resolve(file)

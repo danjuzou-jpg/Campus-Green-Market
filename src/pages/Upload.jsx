@@ -32,12 +32,19 @@ const Upload = () => {
       showToast('warning', t.maxImages)
       return
     }
-    // 压缩图片
+    // 压缩图片（compressImage 会校验类型和大小，失败时 reject）
     const compressed = []
     for (const f of files) {
-      const c = await compressImage(f)
-      compressed.push(c)
+      try {
+        const c = await compressImage(f)
+        compressed.push(c)
+      } catch (err) {
+        showToast('error', language === 'zh'
+          ? `图片无法处理：${err.message}`
+          : `Image error: ${err.message}`)
+      }
     }
+    if (compressed.length === 0) return
     const newImages = [...images, ...compressed]
     setImages(newImages)
     // 使用压缩后的文件生成预览，与实际上传一致
@@ -115,7 +122,7 @@ const Upload = () => {
                   <span className="text-xl font-bold leading-none mb-0.5">+</span>
                 </div>
                 <div className="text-[10px] font-bold">{t.addPhoto}</div>
-                <input type="file" accept="image/*" multiple onChange={onImageChange} className="hidden" />
+                <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={onImageChange} className="hidden" />
               </label>
             )}
           </div>

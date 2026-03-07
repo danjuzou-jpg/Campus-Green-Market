@@ -43,6 +43,10 @@ const Auth = () => {
                 if (error) throw error
                 navigate('/home')
             } else if (mode === 'register') {
+                // 校园邮箱域名限制：仅允许 .edu.my 邮箱注册
+                if (!email.toLowerCase().endsWith('.edu.my')) {
+                    throw new Error(text.eduEmailRequired)
+                }
                 const { error } = await supabase.auth.signUp({
                     email,
                     password,

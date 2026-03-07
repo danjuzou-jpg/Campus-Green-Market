@@ -224,20 +224,24 @@ CREATE POLICY "Authenticated users can upload product images"
     AND auth.role() = 'authenticated'
   );
 
--- 更新：登录用户可以更新自己上传的（用于 upsert）
+-- 更新：只能更新自己文件夹下的图片（路径前缀为 {userId}/...）
+-- 安全修复 (P0-2): 配合客户端上传路径改为 `${userId}/${filename}` 使用
 CREATE POLICY "Authenticated users can update product images"
   ON storage.objects FOR UPDATE
   USING (
     bucket_id = 'product-images'
     AND auth.role() = 'authenticated'
+    AND (storage.foldername(name))[1] = auth.uid()::text
   );
 
--- 删除：登录用户可以删除（用于商品删除时清理图片）
+-- 删除：只能删除自己文件夹下的图片（路径前缀为 {userId}/...）
+-- 安全修复 (P0-2): 配合客户端上传路径改为 `${userId}/${filename}` 使用
 CREATE POLICY "Authenticated users can delete product images"
   ON storage.objects FOR DELETE
   USING (
     bucket_id = 'product-images'
     AND auth.role() = 'authenticated'
+    AND (storage.foldername(name))[1] = auth.uid()::text
   );
 
 

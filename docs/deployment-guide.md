@@ -24,7 +24,7 @@
 
 2. **在本地电脑上执行推送命令**
    - 回到你的代码编辑器（VS Code）的终端（Terminal）。
-   - 确保你当前在项目目录 `secondhand_market_2nh` 下。
+   - 确保你当前在项目目录 `secondhand_market_2nh` 下。我不是在antigravity里面进行嘛？
    - 依次复制粘贴并执行以下命令（注意将最后一条命令中的代码替换为你刚刚在 GitHub 创建成功后页面上显示的完整 URL）：
 
    ```bash
@@ -32,8 +32,8 @@
    git add .
    git commit -m "first commit for production"
    git branch -M main
-   # ⚠️ 注意：把下面这行的 URL 换成你自己的！
-   git remote add origin https://github.com/你的GitHub用户名/2nh-marketplace-web.git
+   # ⚠️ 注意：把下面这行的 URL 换成你自己的！已经换好了
+   git remote add origin https://github.com/danjuzou-jpg/2nh-marketplace-web--version1.git
    git push -u origin main
    ```
    *（如果提示需要登录，请按照终端弹出的提示登录你的 GitHub 账号）*
@@ -86,9 +86,9 @@
 1. 登录 [Supabase 控制台](https://supabase.com/dashboard/)，进入你的项目。
 2. 在左侧菜单点击 **"Authentication"**（认证）。
 3. 展开左侧子菜单，点击 **"URL Configuration"**。
-4. 找到 **"Site URL"**，将其修改为你**刚刚绑定成功的自定义域名**（必须带上 `https://`，例如：`https://danjumart.com`）。
+4. 找到 **"Site URL"**，将其修改为你**刚刚绑定成功的自定义域名**（必须带上 `https://`，例如：`https://green2h.com`）。
 5. 找到下方的 **"Redirect URLs"**，点击 **"Add URL"**。
-6. 输入你的新域名加上 `/*`，例如：`https://danjumart.com/*`。
+6. 输入你的新域名加上 `/*`，例如：`https://green2h.com/*`。
    *（建议同时保留 `http://localhost:5173/*`，方便你以后本地继续开发测试）*
 7. 点击绿色的 **"Save"** 保存设置。
 

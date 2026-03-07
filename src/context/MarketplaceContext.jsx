@@ -243,6 +243,7 @@ export const MarketplaceProvider = ({ children }) => {
       newPasswordSubtitle: 'Please enter your new password',
       updatePassword: 'Update Password',
       passwordUpdated: 'Password updated successfully! Please log in.',
+      eduEmailRequired: 'Only Malaysian university emails (.edu.my) are allowed. Please use your campus email.',
     },
     zh: {
       // 导航
@@ -399,6 +400,7 @@ export const MarketplaceProvider = ({ children }) => {
       newPasswordSubtitle: '请输入您的新密码',
       updatePassword: '更新密码',
       passwordUpdated: '密码更新成功，请使用新密码登录！',
+      eduEmailRequired: '仅限马来西亚大学校园邮箱（.edu.my）注册，请使用你的校园邮箱。',
     }
   }), [])
 
@@ -512,21 +514,10 @@ export const MarketplaceProvider = ({ children }) => {
       }
     } catch (err) {
       console.error('Error fetching/creating profile:', err)
-
-      // Try to recover verification status from local fallback if Supabase fails
-      try {
-        const fallback = localStorage.getItem(`verification_fallback_${userId}`)
-        if (fallback) {
-          const { status } = JSON.parse(fallback)
-          setUser(prev => ({
-            ...prev,
-            verificationStatus: status,
-            verified: status === 'verified'
-          }))
-        }
-      } catch (e) {
-        console.error('Error reading verification fallback:', e)
-      }
+      // ⚠️ 安全修复 (P0-3): 完全移除 localStorage 认证状态回退。
+      // 旧逻辑允许用户通过 DevTools 手动伪造 verification_fallback_xxx 来
+      // 解锁联系方式，违反了平台的学生认证保护。
+      // 如果 Supabase 请求失败，用户保持 unverified 状态，待下次刷新后重试。
     }
   }
 
@@ -581,8 +572,12 @@ export const MarketplaceProvider = ({ children }) => {
         // Multi-keyword fuzzy search fallback
         if (searchTerm) {
           const keywords = searchTerm.trim().split(/\s+/).filter(Boolean)
+          // 安全修复 (P2-6): 转义 PostgREST 过滤字符串中的特殊字符，
+          // 防止用户通过输入 % _ , . 等字符操纵查询语法
+          const escapePostgrest = (str) => str.replace(/[%_,.]/g, '\\$&')
           keywords.forEach(kw => {
-            q = q.or(`title.ilike.%${kw}%,description.ilike.%${kw}%,location_name.ilike.%${kw}%`)
+            const safeKw = escapePostgrest(kw)
+            q = q.or(`title.ilike.%${safeKw}%,description.ilike.%${safeKw}%,location_name.ilike.%${safeKw}%`)
           })
         }
 
@@ -702,7 +697,10 @@ export const MarketplaceProvider = ({ children }) => {
       const uploadedUrls = []
       for (const file of images) {
         const fileExt = file.name.split('.').pop()
-        const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`
+        // 安全修复 (P0-2): 在文件路径中加入 userId 作为文件夹前缀，
+        // 配合 Storage RLS 策略中的 storage.foldername(name)[1] = auth.uid()::text
+        // 使得只有文件所有者可以删除/更新自己的图片
+        const fileName = `${session.user.id}/${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`
 
         const { error: uploadError } = await supabase.storage
           .from('product-images')
@@ -1354,6 +1352,9 @@ export const MarketplaceProvider = ({ children }) => {
     fetchFavoriteProducts,
     // 3.1 Loading
     loading,
+    // 安全修复 (P0-1): authLoading 加入 context value，
+    // 使 RequireAuth 路由守卫能正确显示加载动画，防止刷新时闪屏跳转
+    authLoading,
     // 3.2 Toast
     toast,
     showToast,
@@ -1361,7 +1362,7 @@ export const MarketplaceProvider = ({ children }) => {
     // 3.6 Report
     reportContent,
     unreadCount
-  }), [listings, favorites, language, user, session, uniqueLocations, conversations, userLocation, loading, toast, unreadCount,
+  }), [listings, favorites, language, user, session, uniqueLocations, conversations, userLocation, loading, authLoading, toast, unreadCount,
     // useCallback-stabilized functions
     addListing, updateListing, deleteListing, toggleFavorite, toggleLanguage, logoutUser,
     normalize, sendMessage, findConversation, createConversationWithMessage, markConversationRead, fetchConversations,
