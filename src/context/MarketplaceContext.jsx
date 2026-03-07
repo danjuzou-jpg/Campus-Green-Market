@@ -1,5 +1,6 @@
 import React, { createContext, useContext, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
+import { POPULAR_LOCATIONS } from '../lib/locations.js'
 
 const MarketplaceContext = createContext(null)
 
@@ -13,6 +14,29 @@ const CATEGORY_DEF = [
   { key: 'Rentals', en: 'Rentals', zh: '租房找室友' },
   { key: 'Others', en: 'Others', zh: '其他' }
 ]
+
+// 纯函数：将数据库商品记录映射为前端对象（模块级，无组件依赖）
+const mapDBProduct = (p, currentUserId) => ({
+  id: p.id,
+  title: p.title,
+  price: p.price,
+  imageUrl: p.images?.[0] || '',
+  imageUrls: p.images || [],
+  description: p.description,
+  createdAt: new Date(p.created_at).getTime(),
+  contact: p.contact_info?.whatsapp || '',
+  whatsapp: p.contact_info?.whatsapp || '',
+  wechat: p.contact_info?.wechat || '',
+  instagram: p.contact_info?.instagram || '',
+  locationName: p.location_name,
+  lat: p.lat,
+  lng: p.lng,
+  category: p.category,
+  tags: p.tags || [],
+  currency: p.currency || 'MYR',
+  owner: currentUserId && currentUserId === p.owner_id ? 'me' : 'others',
+  owner_id: p.owner_id
+})
 
 export const MarketplaceProvider = ({ children }) => {
   const [listings, setListings] = useState([])
@@ -30,20 +54,9 @@ export const MarketplaceProvider = ({ children }) => {
     school: 'Universiti Malaya (UM)',
     verified: false,
     verificationStatus: 'unverified',
-    avatar: 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&q=80'
+    avatar: '/default-avatar.svg'
   })
-  const POPULAR_LOCATIONS = [
-    'All Locations',
-    'Ryan & Miho',
-    'Jaya One',
-    'Pacific Tower',
-    'Seventeen Residence',
-    'PJ Midtown',
-    'South Link',
-    'Southview',
-    'KL Gateway',
-    '线上'
-  ]
+  // POPULAR_LOCATIONS 已统一至 src/lib/locations.js 管理
 
   const [locations, setLocations] = useState(POPULAR_LOCATIONS)
 
@@ -52,8 +65,8 @@ export const MarketplaceProvider = ({ children }) => {
     // 不再动态请求，避免用户乱填的位置污染首页侧拉分类栏。
   }, [])
 
-  // Ensure locations are unique
-  const uniqueLocations = useMemo(() => POPULAR_LOCATIONS, [])
+  // POPULAR_LOCATIONS 为模块级常量，直接引用无需 useMemo
+  const uniqueLocations = POPULAR_LOCATIONS
 
   const [conversations, setConversations] = useState([])
   const [userLocation, setUserLocation] = useState(null)
@@ -200,6 +213,36 @@ export const MarketplaceProvider = ({ children }) => {
       searchHistory: 'Recent Searches',
       clearHistory: 'Clear',
       hotTags: 'Popular Tags',
+      // 首页卡片
+      wantIt: 'I Want It',
+      // Auth 页
+      loginTitle: 'Welcome Back',
+      registerTitle: 'Create Account',
+      loginSubtitle: 'Sign in to your 2H account',
+      registerSubtitle: 'Join the 2H campus marketplace',
+      email: 'Email',
+      password: 'Password',
+      fullName: 'Your Name',
+      login: 'Sign In',
+      register: 'Sign Up',
+      switchToRegister: "Don't have an account? Sign Up",
+      switchToLogin: 'Already have an account? Sign In',
+      emailInputPlaceholder: 'Enter your email',
+      passwordInputPlaceholder: 'Password (min 6 characters)',
+      namePlaceholder: 'Enter your name',
+      registerSuccess: 'Registration successful! Please check your email to verify.',
+      orContinueWith: 'or',
+      guestMode: 'Browse as Guest',
+      forgotPassword: 'Forgot Password?',
+      resetPasswordTitle: 'Reset Password',
+      resetPasswordSubtitle: 'Enter your email to receive a reset link',
+      sendResetLink: 'Send Reset Link',
+      backToLogin: 'Back to Login',
+      resetEmailSent: 'Password reset link sent! Please check your email.',
+      newPasswordTitle: 'Set New Password',
+      newPasswordSubtitle: 'Please enter your new password',
+      updatePassword: 'Update Password',
+      passwordUpdated: 'Password updated successfully! Please log in.',
     },
     zh: {
       // 导航
@@ -326,6 +369,36 @@ export const MarketplaceProvider = ({ children }) => {
       searchHistory: '最近搜索',
       clearHistory: '清空',
       hotTags: '热门标签',
+      // 首页卡片
+      wantIt: '我想要',
+      // Auth 页
+      loginTitle: '欢迎回来',
+      registerTitle: '创建账号',
+      loginSubtitle: '登录你的 2H 账号',
+      registerSubtitle: '加入 2H 校园二手市场',
+      email: '邮箱地址',
+      password: '密码',
+      fullName: '你的昵称',
+      login: '登录',
+      register: '注册',
+      switchToRegister: '没有账号？去注册',
+      switchToLogin: '已有账号？去登录',
+      emailInputPlaceholder: '输入你的邮箱',
+      passwordInputPlaceholder: '输入密码（最少6位）',
+      namePlaceholder: '输入你的昵称',
+      registerSuccess: '注册成功！请检查邮箱完成验证。',
+      orContinueWith: '或者',
+      guestMode: '先逗逗（游客模式）',
+      forgotPassword: '忘记密码？',
+      resetPasswordTitle: '重置密码',
+      resetPasswordSubtitle: '输入你的邮箱，我们将发送重置链接',
+      sendResetLink: '发送重置链接',
+      backToLogin: '返回登录',
+      resetEmailSent: '重置密码链接已发送至您的邮箱！请查收。',
+      newPasswordTitle: '设置新密码',
+      newPasswordSubtitle: '请输入您的新密码',
+      updatePassword: '更新密码',
+      passwordUpdated: '密码更新成功，请使用新密码登录！',
     }
   }), [])
 
@@ -360,7 +433,7 @@ export const MarketplaceProvider = ({ children }) => {
           school: 'Universiti Malaya (UM)',
           verified: false,
           verificationStatus: 'unverified',
-          avatar: 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&q=80'
+          avatar: '/default-avatar.svg'
         })
         setFavorites([])
         setConversations([])
@@ -370,6 +443,26 @@ export const MarketplaceProvider = ({ children }) => {
 
     return () => subscription.unsubscribe()
   }, [])
+
+  // 更新 last_seen_at：登录时、切回标签页时、每5分钟定时触发
+  useEffect(() => {
+    if (!session?.user?.id) return
+    const userId = session.user.id
+    const doUpdate = () => {
+      supabase.from('profiles')
+        .update({ last_seen_at: new Date().toISOString() })
+        .eq('id', userId)
+        .then()
+    }
+    doUpdate()
+    const handleVisibility = () => { if (!document.hidden) doUpdate() }
+    document.addEventListener('visibilitychange', handleVisibility)
+    const interval = setInterval(doUpdate, 5 * 60 * 1000)
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibility)
+      clearInterval(interval)
+    }
+  }, [session?.user?.id])
 
   const fetchProfile = async (userId) => {
     try {
@@ -386,7 +479,7 @@ export const MarketplaceProvider = ({ children }) => {
           school: data.school || 'Universiti Malaya (UM)',
           verified: data.verification_status === 'verified',
           verificationStatus: data.verification_status || 'unverified',
-          avatar: data.avatar_url || 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&q=80',
+          avatar: data.avatar_url || '/default-avatar.svg',
           email: data.email
         })
       } else if (error && (error.code === 'PGRST116' || error.details?.includes('0 rows'))) {
@@ -412,7 +505,7 @@ export const MarketplaceProvider = ({ children }) => {
             school: newProfile.school,
             verified: false,
             verificationStatus: 'unverified',
-            avatar: newProfile.avatar_url || 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&q=80',
+            avatar: newProfile.avatar_url || '/default-avatar.svg',
             email: newProfile.email
           })
         }
@@ -438,63 +531,22 @@ export const MarketplaceProvider = ({ children }) => {
   }
 
   const getProductById = useCallback(async (id, currentUserId = null) => {
-    // 1. Try to find in current listings memory
+    // 1. 先在内存中找
     const local = listings.find(l => l.id === id)
     if (local) return local
 
-    // 2. Otherwise fetch from Supabase
+    // 2. 否则向 Supabase 单独请求
     try {
       const { data: p, error } = await supabase.from('products').select('*').eq('id', id).single()
       if (error || !p) return null
-
-      return {
-        id: p.id,
-        title: p.title,
-        price: p.price,
-        imageUrl: p.images?.[0] || '',
-        imageUrls: p.images || [],
-        description: p.description,
-        createdAt: new Date(p.created_at).getTime(),
-        contact: p.contact_info?.whatsapp || '',
-        whatsapp: p.contact_info?.whatsapp || '',
-        wechat: p.contact_info?.wechat || '',
-        instagram: p.contact_info?.instagram || '',
-        locationName: p.location_name,
-        lat: p.lat,
-        lng: p.lng,
-        category: p.category,
-        tags: p.tags || [],
-        currency: p.currency || 'MYR',
-        owner: currentUserId && currentUserId === p.owner_id ? 'me' : 'others',
-        owner_id: p.owner_id
-      }
+      return mapDBProduct(p, currentUserId)
     } catch (err) {
       console.error('Error fetching product by id:', err)
       return null
     }
   }, [listings])
 
-  const mapDBProduct = (p, currentUserId) => ({
-    id: p.id,
-    title: p.title,
-    price: p.price,
-    imageUrl: p.images?.[0] || '',
-    imageUrls: p.images || [],
-    description: p.description,
-    createdAt: new Date(p.created_at).getTime(),
-    contact: p.contact_info?.whatsapp || '',
-    whatsapp: p.contact_info?.whatsapp || '',
-    wechat: p.contact_info?.wechat || '',
-    instagram: p.contact_info?.instagram || '',
-    locationName: p.location_name,
-    lat: p.lat,
-    lng: p.lng,
-    category: p.category,
-    tags: p.tags || [],
-    currency: p.currency || 'MYR',
-    owner: currentUserId && currentUserId === p.owner_id ? 'me' : 'others',
-    owner_id: p.owner_id
-  })
+  // mapDBProduct 已提升至模块级（文件顶部），这里不再重复定义
 
   // Home Page Paged Search
   const fetchProducts = useCallback(async (currentUserId = null, {
@@ -730,7 +782,7 @@ export const MarketplaceProvider = ({ children }) => {
       if (!fetchError && productData?.images?.length) {
         for (const url of productData.images) {
           if (!url) continue
-          const fileName = url.substring(url.lastIndexOf('/') + 1)
+          const fileName = url.split('/').pop()?.split('?')[0]
           if (fileName) {
             await supabase.storage.from('product-images').remove([fileName])
           }
@@ -752,7 +804,7 @@ export const MarketplaceProvider = ({ children }) => {
       showToast('error', language === 'zh' ? '删除失败' : 'Failed to delete')
       return false
     }
-  }, [session, language, showToast, listings, fetchLocations])
+  }, [session, language, showToast, fetchLocations])
 
   const deleteProduct = useCallback((id) => deleteListing(id), [deleteListing])
 
@@ -880,7 +932,7 @@ export const MarketplaceProvider = ({ children }) => {
       // 1. Delete removed images from storage
       for (const url of deletedImages) {
         if (!url) continue;
-        const fileName = url.substring(url.lastIndexOf('/') + 1)
+        const fileName = url.split('/').pop()?.split('?')[0]
         if (fileName) {
           const { error } = await supabase.storage.from('product-images').remove([fileName])
           if (error) console.error('Failed to remove old image:', error)
@@ -1238,6 +1290,26 @@ export const MarketplaceProvider = ({ children }) => {
     }
   }, [session, user.name, language, showToast])
 
+  // 实时新消息：只追加到对应会话，避免全量 fetchConversations
+  const addIncomingMessage = useCallback((conversationId, rawMsg) => {
+    const newMsg = {
+      id: rawMsg.id,
+      text: rawMsg.content,
+      sender: 'other',
+      timestamp: new Date(rawMsg.created_at).getTime()
+    }
+    setConversations(prev => prev.map(c => {
+      if (c.id !== conversationId) return c
+      return {
+        ...c,
+        messages: [...c.messages, newMsg],
+        lastMessage: rawMsg.content,
+        lastTimestamp: new Date(rawMsg.created_at).getTime(),
+        unreadCount: markingReadRef.current.has(conversationId) ? 0 : (c.unreadCount || 0) + 1
+      }
+    }))
+  }, [])
+
   const unreadCount = useMemo(() => {
     return conversations.reduce((total, conv) => total + (conv.unreadCount || 0), 0)
   }, [conversations])
@@ -1272,6 +1344,7 @@ export const MarketplaceProvider = ({ children }) => {
     markConversationRead,
     fetchConversations,
     deleteConversation,
+    addIncomingMessage,
     userLocation,
     setUserLocation,
     // New Fetchers for Pagination
@@ -1292,7 +1365,7 @@ export const MarketplaceProvider = ({ children }) => {
     // useCallback-stabilized functions
     addListing, updateListing, deleteListing, toggleFavorite, toggleLanguage, logoutUser,
     normalize, sendMessage, findConversation, createConversationWithMessage, markConversationRead, fetchConversations,
-    deleteConversation, reportContent, showToast, clearToast, translations,
+    deleteConversation, addIncomingMessage, reportContent, showToast, clearToast, translations,
     getProductById, fetchProducts, fetchUserProducts, fetchFavoriteProducts])
   return <MarketplaceContext.Provider value={value}>{children}</MarketplaceContext.Provider>
 }

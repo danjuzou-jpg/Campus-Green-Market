@@ -8,15 +8,9 @@ import { Mail, Lock, User, ArrowRight, Eye, EyeOff } from 'lucide-react'
 const Auth = () => {
     const navigate = useNavigate()
     const { language, translations } = useMarketplace()
-    const [mode, setMode] = useState('login') // 'login' | 'register' | 'forgot' | 'update'
+    const text = translations[language] || translations['en']
 
-    React.useEffect(() => {
-        // Detect if coming from a password recovery link
-        const hash = window.location.hash
-        if (hash && hash.includes('type=recovery')) {
-            setMode('update')
-        }
-    }, [])
+    const [mode, setMode] = useState('login') // 'login' | 'register' | 'forgot' | 'update'
     const [email, setEmail] = useState('')
     const [password, setPassword] = useState('')
     const [fullName, setFullName] = useState('')
@@ -25,71 +19,17 @@ const Auth = () => {
     const [error, setError] = useState('')
     const [successMessage, setSuccessMessage] = useState('')
 
-    const t = {
-        zh: {
-            loginTitle: '欢迎回来',
-            registerTitle: '创建账号',
-            loginSubtitle: '登录你的 2H 账号',
-            registerSubtitle: '加入 2H 校园二手市场',
-            email: '邮箱地址',
-            password: '密码',
-            fullName: '你的昵称',
-            login: '登录',
-            register: '注册',
-            switchToRegister: '没有账号？去注册',
-            switchToLogin: '已有账号？去登录',
-            emailPlaceholder: '输入你的邮箱',
-            passwordPlaceholder: '输入密码（最少6位）',
-            namePlaceholder: '输入你的昵称',
-            registerSuccess: '注册成功！请检查邮箱完成验证。',
-            orContinueWith: '或者',
-            guestMode: '先逛逛（游客模式）',
-            forgotPassword: '忘记密码？',
-            resetPasswordTitle: '重置密码',
-            resetPasswordSubtitle: '输入你的邮箱，我们将发送重置链接',
-            sendResetLink: '发送重置链接',
-            backToLogin: '返回登录',
-            resetEmailSent: '重置密码链接已发送至您的邮箱！请查收。',
-            newPasswordTitle: '设置新密码',
-            newPasswordSubtitle: '请输入您的新密码',
-            updatePassword: '更新密码',
-            passwordUpdated: '密码更新成功，请使用新密码登录！'
-        },
-        en: {
-            loginTitle: 'Welcome Back',
-            registerTitle: 'Create Account',
-            loginSubtitle: 'Sign in to your 2H account',
-            registerSubtitle: 'Join the 2H campus marketplace',
-            email: 'Email',
-            password: 'Password',
-            fullName: 'Your Name',
-            login: 'Sign In',
-            register: 'Sign Up',
-            switchToRegister: "Don't have an account? Sign Up",
-            switchToLogin: 'Already have an account? Sign In',
-            emailPlaceholder: 'Enter your email',
-            passwordPlaceholder: 'Password (min 6 characters)',
-            namePlaceholder: 'Enter your name',
-            registerSuccess: 'Registration successful! Please check your email to verify.',
-            orContinueWith: 'or',
-            guestMode: 'Browse as Guest',
-            forgotPassword: 'Forgot Password?',
-            resetPasswordTitle: 'Reset Password',
-            resetPasswordSubtitle: 'Enter your email to receive a reset link',
-            sendResetLink: 'Send Reset Link',
-            backToLogin: 'Back to Login',
-            resetEmailSent: 'Password reset link sent to your email! Please check.',
-            newPasswordTitle: 'Set New Password',
-            newPasswordSubtitle: 'Please enter your new password',
-            updatePassword: 'Update Password',
-            passwordUpdated: 'Password updated successfully! Please log in.'
+    React.useEffect(() => {
+        // Detect if coming from a password recovery link
+        const hash = window.location.hash
+        if (hash && hash.includes('type=recovery')) {
+            setMode('update')
         }
-    }
-
-    const text = t[language] || t.zh
+    }, [])
 
     const handleSubmit = async (e) => {
         e.preventDefault()
+
         setError('')
         setSuccessMessage('')
         setLoading(true)
@@ -193,7 +133,7 @@ const Auth = () => {
                                         type="email"
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
-                                        placeholder={text.emailPlaceholder}
+                                        placeholder={text.emailInputPlaceholder}
                                         required
                                         className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-11 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                                     />
@@ -213,7 +153,7 @@ const Auth = () => {
                                         type={showPassword ? 'text' : 'password'}
                                         value={password}
                                         onChange={(e) => setPassword(e.target.value)}
-                                        placeholder={text.passwordPlaceholder}
+                                        placeholder={text.passwordInputPlaceholder}
                                         required
                                         minLength={6}
                                         className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-11 pr-11 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"

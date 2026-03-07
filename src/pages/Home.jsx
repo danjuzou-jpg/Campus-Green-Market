@@ -2,6 +2,7 @@ import React, { useMemo, useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMarketplace } from '../context/MarketplaceContext.jsx'
 import { SkeletonCard } from '../components/Skeleton.jsx'
+import { LOCATION_ALIASES } from '../lib/locations.js'
 import { Search, Menu, X, LayoutGrid, MonitorSmartphone, Sparkles, Sofa, BookOpen, Gamepad2, Building2, Package, MapPin } from 'lucide-react'
 
 const fmtDate = (ts, lang) => {
@@ -18,7 +19,11 @@ const SEARCH_HISTORY_KEY = '2nh_search_history'
 const MAX_HISTORY = 8
 
 const Home = () => {
-  const { listings, categories, language, translations, locations, normalize, setUserLocation, userLocation, favorites, toggleFavorite, user, loading } = useMarketplace()
+  const {
+    listings, categories, language, translations, locations, normalize,
+    setUserLocation, userLocation, favorites, toggleFavorite, user, loading,
+    fetchProducts, session
+  } = useMarketplace()
   const t = translations[language]
   const navigate = useNavigate()
   const [term, setTerm] = useState('')
@@ -27,13 +32,11 @@ const Home = () => {
   const [distance, setDistance] = useState('Any')
   const [toast, setToast] = useState('')
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
-  const [showSearchPanel, setShowSearchPanel] = useState(false)
 
   // Pagination & Backend Fetch States
   const [appliedTerm, setAppliedTerm] = useState('')
   const [page, setPage] = useState(1)
   const [hasMore, setHasMore] = useState(true)
-  const { fetchProducts, session } = useMarketplace()
 
   // 搜索历史
   const [searchHistory, setSearchHistory] = useState(() => {
@@ -85,28 +88,7 @@ const Home = () => {
         return
       }
 
-      // 提取符合系统字典的地点 (支持别名模糊匹配)
-      const LOCATION_ALIASES = {
-        'ryan': 'Ryan & Miho',
-        'miho': 'Ryan & Miho',
-        'jaya': 'Jaya One',
-        'pacific': 'Pacific Tower',
-        'seventeen': 'Seventeen Residence',
-        '17': 'Seventeen Residence',
-        'midtown': 'PJ Midtown',
-        'pj': 'PJ Midtown',
-        'south link': 'South Link',
-        'southlink': 'South Link',
-        'southview': 'Southview',
-        'south view': 'Southview',
-        'kl gateway': 'KL Gateway',
-        'gateway': 'KL Gateway',
-        'um library': 'UM Library',
-        'library': 'UM Library',
-        '线上': '线上',
-        'online': '线上'
-      };
-
+      // 提取符合系统字典的地点（使用 lib/locations.js 统一维护的别名）
       let processedTerm = q;
       let lowerQ = q.toLowerCase();
       let foundOfficialLoc = null;
@@ -118,9 +100,8 @@ const Home = () => {
         foundOfficialLoc = exactLoc;
         matchedAlias = exactLoc;
       } else {
-        // 全称没中，尝试使用常见别名匹配
+        // 使用 LOCATION_ALIASES（从 lib/locations.js 导入）
         for (const [alias, officialStr] of Object.entries(LOCATION_ALIASES)) {
-          // 为了防止如 'pj' 匹配到单词里的一小截，最好加上简单的边界要求，但考虑到用户瞎敲，直接includes通常对这种短搜容错最高
           if (lowerQ.includes(alias)) {
             if (locations.includes(officialStr)) {
               foundOfficialLoc = officialStr;
@@ -132,7 +113,6 @@ const Home = () => {
       }
 
       if (foundOfficialLoc && matchedAlias) {
-        // 把提取出来的地点别名从关键词里剥离 (安全处理特殊字符 Regex)
         const escapeRegExp = string => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const regex = new RegExp(escapeRegExp(matchedAlias), 'i');
         processedTerm = processedTerm.replace(regex, '').trim();
@@ -141,7 +121,6 @@ const Home = () => {
 
       saveSearchTerm(q)
       setAppliedTerm(processedTerm)
-      setShowSearchPanel(false)
     }
   }
 
@@ -385,7 +364,7 @@ const Home = () => {
                       {/* Action Row */}
                       <div className="mt-auto flex items-center justify-between gap-2">
                         <button className="flex-1 bg-emerald-50 text-emerald-600 py-2.5 rounded-2xl text-[13px] font-bold hover:bg-emerald-100 transition-colors">
-                          Buy Now
+                          {t.wantIt}
                         </button>
                         <button
                           onClick={(e) => {

@@ -9,7 +9,7 @@ const ChatRoom = () => {
   const { id } = useParams()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { conversations, sendMessage, language, translations, getProductById, session, fetchConversations, markConversationRead, createConversationWithMessage } = useMarketplace()
+  const { conversations, sendMessage, language, translations, getProductById, session, fetchConversations, markConversationRead, createConversationWithMessage, addIncomingMessage } = useMarketplace()
   const t = translations[language]
   const [inputText, setInputText] = useState('')
   const [showReport, setShowReport] = useState(false)
@@ -23,6 +23,17 @@ const ChatRoom = () => {
   const [product, setProduct] = useState(null)
   const [sellerProfile, setSellerProfile] = useState(null)
   const [sending, setSending] = useState(false)
+  const [otherLastSeen, setOtherLastSeen] = useState(null)
+
+  // 格式化上次活跃时间
+  const formatLastSeen = (date) => {
+    if (!date) return ''
+    const diff = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
+    if (diff < 300) return language === 'zh' ? '刚刚活跃' : 'Active just now'
+    if (diff < 3600) return language === 'zh' ? `${Math.floor(diff / 60)} 分钟前活跃` : `Active ${Math.floor(diff / 60)}m ago`
+    if (diff < 86400) return language === 'zh' ? `${Math.floor(diff / 3600)} 小时前活跃` : `Active ${Math.floor(diff / 3600)}h ago`
+    return language === 'zh' ? `${Math.floor(diff / 86400)} 天前活跃` : `Active ${Math.floor(diff / 86400)}d ago`
+  }
 
   // 获取商品数据
   useEffect(() => {
@@ -35,19 +46,37 @@ const ChatRoom = () => {
     }
   }, [isNewConversation, productIdFromQuery, conv?.productId, getProductById, session, conv?.productImage])
 
-  // 新会话：获取卖家资料
+  // 新会话：获取卖家资料 + last_seen_at
   useEffect(() => {
     if (isNewConversation && product?.owner_id) {
       supabase
         .from('profiles')
-        .select('full_name, avatar_url')
+        .select('full_name, avatar_url, last_seen_at')
         .eq('id', product.owner_id)
         .single()
         .then(({ data }) => {
-          if (data) setSellerProfile(data)
+          if (data) {
+            setSellerProfile(data)
+            setOtherLastSeen(data.last_seen_at)
+          }
         })
     }
   }, [isNewConversation, product?.owner_id])
+
+  // 已有会话：获取对方 last_seen_at
+  useEffect(() => {
+    const otherId = conv?.otherUserId
+    if (!isNewConversation && otherId) {
+      supabase
+        .from('profiles')
+        .select('last_seen_at')
+        .eq('id', otherId)
+        .single()
+        .then(({ data }) => {
+          if (data?.last_seen_at) setOtherLastSeen(data.last_seen_at)
+        })
+    }
+  }, [isNewConversation, conv?.otherUserId])
 
   useEffect(() => {
     if (scrollRef.current) {
@@ -87,14 +116,15 @@ const ChatRoom = () => {
       }, (payload) => {
         const msg = payload.new
         if (msg.sender_id !== session.user.id) {
-          fetchConversations(session.user.id)
+          // 局部追加，避免全量重载所有会话
+          addIncomingMessage(id, msg)
         }
       })
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [id, isNewConversation, session?.user?.id])
+  }, [id, isNewConversation, session?.user?.id, addIncomingMessage])
 
   // 新会话且缺少 productId 参数 → 无效访问
   if (isNewConversation && !productIdFromQuery) {
@@ -176,7 +206,9 @@ const ChatRoom = () => {
           onClick={() => otherUserId && navigate(`/user/${otherUserId}`)}
         >
           <div className="font-bold text-gray-900 leading-tight">{otherName}</div>
-          <div className="text-[10px] text-green-500 font-medium">● {t.online}</div>
+          <div className="text-[10px] text-gray-400 font-medium">
+            {otherLastSeen ? formatLastSeen(otherLastSeen) : ''}
+          </div>
         </div>
         {!isNewConversation && (
           <button

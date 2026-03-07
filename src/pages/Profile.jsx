@@ -2,6 +2,7 @@ import { useMemo, useRef, useState, useEffect } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useMarketplace } from '../context/MarketplaceContext.jsx'
 import { supabase } from '../lib/supabaseClient.js'
+import ConfirmDialog from '../components/ConfirmDialog.jsx'
 import { CheckCircle, Trash2, ChevronRight, MessageSquare, UserCircle, X, Mail, FileText, Camera, Edit3 } from 'lucide-react'
 
 const Profile = () => {
@@ -9,6 +10,7 @@ const Profile = () => {
   const { user, language, translations, updateVerificationStatus, uploadAvatar, updateUser, deleteProduct, logoutUser, sendVerificationEmail, uploadVerificationDoc, showToast, fetchUserProducts, fetchFavoriteProducts, session } = useMarketplace()
   const t = translations[language]
   const [tab, setTab] = useState('my')
+  const [confirmDialog, setConfirmDialog] = useState(null)
 
   // Data Fetching State
   const [myListings, setMyListings] = useState([])
@@ -132,13 +134,18 @@ const Profile = () => {
   }
 
   const handleDelete = async (id) => {
-    if (window.confirm(t.confirmDelete)) {
-      const success = await deleteProduct(id)
-      if (success) {
-        setMyListings(prev => prev.filter(l => l.id !== id))
-        setFavoriteItems(prev => prev.filter(l => l.id !== id))
-      }
-    }
+    setConfirmDialog({
+      message: t.confirmDelete,
+      onConfirm: async () => {
+        setConfirmDialog(null)
+        const success = await deleteProduct(id)
+        if (success) {
+          setMyListings(prev => prev.filter(l => l.id !== id))
+          setFavoriteItems(prev => prev.filter(l => l.id !== id))
+        }
+      },
+      onCancel: () => setConfirmDialog(null)
+    })
   }
 
   const Card = ({ item, isOwner }) => (
@@ -355,11 +362,16 @@ const Profile = () => {
       {/* Area C: Bottom Operations */}
       <div className="mt-12 px-4 pb-10">
         <button
-          onClick={async () => {
-            if (confirm(t.confirmLogout)) {
-              await logoutUser()
-              navigate('/auth')
-            }
+          onClick={() => {
+            setConfirmDialog({
+              message: t.confirmLogout,
+              onConfirm: async () => {
+                setConfirmDialog(null)
+                await logoutUser()
+                navigate('/auth')
+              },
+              onCancel: () => setConfirmDialog(null)
+            })
           }}
           className="w-full py-4 text-xs font-bold text-gray-400 hover:text-red-500 transition-colors uppercase tracking-widest"
         >
@@ -477,6 +489,17 @@ const Profile = () => {
             </div>
           </div>
         </div>
+      )}
+
+      {/* 自定义确认弹窗 */}
+      {confirmDialog && (
+        <ConfirmDialog
+          message={confirmDialog.message}
+          confirmText={t.confirm}
+          cancelText={t.cancel}
+          onConfirm={confirmDialog.onConfirm}
+          onCancel={confirmDialog.onCancel}
+        />
       )}
     </div>
   )
