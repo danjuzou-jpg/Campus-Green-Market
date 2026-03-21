@@ -9,7 +9,7 @@ const ChatRoom = () => {
   const { id } = useParams()
   const [searchParams] = useSearchParams()
   const navigate = useNavigate()
-  const { conversations, sendMessage, language, translations, getProductById, session, fetchConversations, markConversationRead, createConversationWithMessage, addIncomingMessage } = useMarketplace()
+  const { conversations, sendMessage, language, translations, getProductById, session, fetchConversations, markConversationRead, createConversationWithMessage, addIncomingMessage, showToast } = useMarketplace()
   const t = translations[language]
   const [inputText, setInputText] = useState('')
   const [showReport, setShowReport] = useState(false)
@@ -78,25 +78,40 @@ const ChatRoom = () => {
     }
   }, [isNewConversation, conv?.otherUserId])
 
+  // Fix 1-4: Viewport Height Fix for mobile keyboards
+  // 追踪 visualViewport 的 offsetTop（键盘弹起时布局视口与视觉视口的偏移）和 height
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
+  const [vp, setVp] = useState({
+    top: window.visualViewport?.offsetTop ?? 0,
+    height: window.visualViewport?.height ?? window.innerHeight
+  })
+
+  useEffect(() => {
+    const update = () => {
+      setIsMobile(window.innerWidth < 768)
+      const vv = window.visualViewport
+      setVp({
+        top: vv ? vv.offsetTop : 0,
+        height: vv ? vv.height : window.innerHeight
+      })
+    }
+    // Fix 3: 同时监听 resize 和 scroll，iOS 键盘弹起会同时触发两者
+    window.visualViewport?.addEventListener('resize', update)
+    window.visualViewport?.addEventListener('scroll', update)
+    window.addEventListener('resize', update)
+    return () => {
+      window.visualViewport?.removeEventListener('resize', update)
+      window.visualViewport?.removeEventListener('scroll', update)
+      window.removeEventListener('resize', update)
+    }
+  }, [])
+
+  // Fix 5: 消息更新 或 键盘弹起（vp.height 变化）时都滚底
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
-  }, [conv?.messages])
-
-  // Viewport Height Fix for mobile keyboards
-  const [vpHeight, setVpHeight] = useState(window.innerHeight)
-  useEffect(() => {
-    const handleResize = () => {
-      setVpHeight(window.visualViewport ? window.visualViewport.height : window.innerHeight)
-    }
-    window.visualViewport?.addEventListener('resize', handleResize)
-    window.addEventListener('resize', handleResize)
-    return () => {
-      window.visualViewport?.removeEventListener('resize', handleResize)
-      window.removeEventListener('resize', handleResize)
-    }
-  }, [])
+  }, [conv?.messages, vp.height])
 
   // 标记已读（仅已存在的会话）
   useEffect(() => {
@@ -158,6 +173,9 @@ const ChatRoom = () => {
       if (realConvId) {
         setInputText('')
         navigate(`/chat/${realConvId}`, { replace: true })
+      } else {
+        // Fix 9: 发送失败时给用户明确提示
+        showToast('error', language === 'zh' ? '发送失败，请重试' : 'Failed to send. Please try again.')
       }
     } else {
       sendMessage(id, inputText)
@@ -193,8 +211,8 @@ const ChatRoom = () => {
 
   return (
     <div
-      className="mx-auto max-w-2xl flex flex-col bg-gray-50 fixed inset-0 z-[60] md:relative md:inset-auto md:h-[85vh] md:rounded-3xl md:shadow-2xl md:overflow-hidden md:border md:border-gray-200"
-      style={{ height: window.innerWidth < 768 ? vpHeight : 'auto' }}
+      className="mx-auto max-w-2xl flex flex-col bg-gray-50 fixed z-[60] md:relative md:inset-auto md:h-[85vh] md:rounded-3xl md:shadow-2xl md:overflow-hidden md:border md:border-gray-200"
+      style={isMobile ? { top: vp.top, left: 0, right: 0, height: vp.height } : {}}
     >
       {/* Header */}
       <div className="bg-white px-4 py-3 flex items-center gap-3 shrink-0 shadow-sm z-10">
@@ -224,7 +242,7 @@ const ChatRoom = () => {
       {product && (
         <div className="bg-white border-b px-4 py-2 flex items-center gap-3 shrink-0">
           <div className="w-10 h-10 rounded-lg overflow-hidden border border-gray-100 shrink-0">
-            <img src={product.imageUrls?.[0] || product.imageUrl} alt="" className="w-full h-full object-cover" />
+            <img src={product.imageUrls?.[0] || product.imageUrl} alt="" className="w-full h-full object-cover" onError={(e) => { e.currentTarget.style.opacity = '0' }} />
           </div>
           <div className="flex-1 min-w-0">
             <div className="text-xs font-bold text-gray-900 truncate">{product.title}</div>
@@ -280,7 +298,7 @@ const ChatRoom = () => {
           type="text"
           autoComplete="off"
           autoCorrect="off"
-          autoCapitalize="sentences"
+          autoCapitalize="off"
           spellCheck="false"
           value={inputText}
           onChange={(e) => setInputText(e.target.value)}
