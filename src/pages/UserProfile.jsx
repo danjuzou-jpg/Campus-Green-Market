@@ -4,6 +4,7 @@ import { useMarketplace } from '../context/MarketplaceContext.jsx'
 import { supabase } from '../lib/supabaseClient.js'
 import { ArrowLeft, CheckCircle, Package } from 'lucide-react'
 import { SkeletonCard } from '../components/Skeleton.jsx'
+import { getUserDisplayStatus } from '../lib/userStatus.js'
 
 const UserProfile = () => {
     const { id } = useParams()
@@ -12,6 +13,7 @@ const UserProfile = () => {
     const t = translations[language]
 
     const [profile, setProfile] = useState(null)
+    const [displayStatus, setDisplayStatus] = useState('unverified')
     const [products, setProducts] = useState([])
     const [loading, setLoading] = useState(true)
 
@@ -22,11 +24,14 @@ const UserProfile = () => {
                 // 获取用户资料
                 const { data: profileData } = await supabase
                     .from('profiles')
-                    .select('id, full_name, school, avatar_url, verification_status')
+                    .select('id, full_name, school, avatar_url, verification_status, created_at')
                     .eq('id', id)
                     .single()
 
-                if (profileData) setProfile(profileData)
+                if (profileData) {
+                    setProfile(profileData)
+                    setDisplayStatus(getUserDisplayStatus(profileData))
+                }
 
                 // 获取该用户发布的商品
                 const { data: productsData } = await supabase
@@ -134,8 +139,14 @@ const UserProfile = () => {
                                 <div className="text-xl font-black text-white truncate drop-shadow-sm">
                                     {profile.full_name || 'User'}
                                 </div>
-                                {profile.verification_status === 'verified' && (
+                                {displayStatus === 'verified' && (
                                     <CheckCircle size={20} fill="#fdfbf7" className="text-[#00b478] shrink-0" />
+                                )}
+                                {displayStatus === 'freshman' && (
+                                    <span className="text-lg shrink-0" title="Freshman / 新生">🌱</span>
+                                )}
+                                {displayStatus === 'stranger' && (
+                                    <span className="text-lg shrink-0" title="Stranger / 陌生人">⚠️</span>
                                 )}
                             </div>
                             <div className="text-[13px] text-teal-50 font-bold truncate mt-1 opacity-90 drop-shadow-sm">
@@ -144,15 +155,25 @@ const UserProfile = () => {
 
                             {/* Verification Badge */}
                             <div className="mt-4">
-                                {profile.verification_status === 'verified' ? (
+                                {displayStatus === 'verified' ? (
                                     <div className="inline-flex items-center gap-1.5 px-4 py-2 bg-white/20 min-w-max text-white border border-white/30 rounded-full text-[11px] font-black uppercase tracking-wider backdrop-blur-md">
                                         <span>✅</span>
                                         {language === 'zh' ? '已认证 / Verified' : 'Verified'}
                                     </div>
-                                ) : profile.verification_status === 'pending' ? (
+                                ) : displayStatus === 'freshman' ? (
+                                    <div className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#dcfce7] text-[#166534] border border-[#bbf7d0] rounded-full text-[11px] font-black uppercase tracking-wider backdrop-blur-md shadow-sm">
+                                        <span>🌱</span>
+                                        {language === 'zh' ? '新生 / Freshman' : 'Freshman'}
+                                    </div>
+                                ) : displayStatus === 'pending' || displayStatus === 'pending_offer' ? (
                                     <div className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-400 text-amber-900 rounded-full text-[11px] font-black shadow-lg shadow-black/5 uppercase tracking-wider">
                                         <span className="animate-pulse">⏳</span>
                                         {language === 'zh' ? '审核中' : 'Pending'}
+                                    </div>
+                                ) : displayStatus === 'stranger' ? (
+                                    <div className="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-500 text-white rounded-full text-[11px] font-black shadow-lg shadow-black/5 uppercase tracking-wider border border-rose-400">
+                                        <span>⚠️</span>
+                                        {language === 'zh' ? '陌生人 / Stranger' : 'Stranger'}
                                     </div>
                                 ) : (
                                     <div className="inline-flex items-center gap-1.5 px-4 py-2 bg-white/20 text-white/70 border border-white/20 rounded-full text-[11px] font-bold uppercase tracking-wider backdrop-blur-md">

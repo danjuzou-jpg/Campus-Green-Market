@@ -5,6 +5,7 @@ import { MapPin, Phone, MessageSquare, Heart, Lock, Edit3, Flag, ExternalLink, C
 import { supabase } from '../lib/supabaseClient'
 import { SkeletonDetail } from '../components/Skeleton.jsx'
 import ReportModal from '../components/ReportModal.jsx'
+import { getUserDisplayStatus } from '../lib/userStatus.js'
 
 const ProductDetail = () => {
   const { id } = useParams()
@@ -42,11 +43,14 @@ const ProductDetail = () => {
     if (item?.owner_id) {
       supabase
         .from('profiles')
-        .select('full_name, avatar_url, school')
+        .select('full_name, avatar_url, school, verification_status, created_at')
         .eq('id', item.owner_id)
         .single()
         .then(({ data }) => {
-          if (data) setSellerProfile(data)
+          if (data) {
+            data.displayStatus = getUserDisplayStatus(data)
+            setSellerProfile(data)
+          }
         })
     }
   }, [item?.owner_id])
@@ -250,7 +254,18 @@ const ProductDetail = () => {
                         <img src={sellerProfile.avatar_url || 'https://images.unsplash.com/photo-1502685104226-ee32379fefbe?w=200&q=80'} alt="Seller Avatar" className="w-full h-full object-cover" />
                       </div>
                       <div className="flex flex-col">
-                        <span className="text-[14px] font-bold text-slate-800 leading-tight">{sellerProfile.full_name}</span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="text-[14px] font-bold text-slate-800 leading-tight">{sellerProfile.full_name}</span>
+                          {sellerProfile.displayStatus === 'verified' && (
+                            <span className="inline-flex items-center justify-center w-4 h-4 bg-[#00b478] text-white rounded-full text-[10px] shadow-sm transform -translate-y-0.5" title="Verified / 已认证">✓</span>
+                          )}
+                          {sellerProfile.displayStatus === 'freshman' && (
+                            <span className="text-sm transform -translate-y-0.5" title="Freshman / 新生">🌱</span>
+                          )}
+                          {sellerProfile.displayStatus === 'stranger' && (
+                            <span className="text-sm transform -translate-y-0.5" title="Stranger / 陌生人">⚠️</span>
+                          )}
+                        </div>
                         <span className="text-[12px] text-slate-500">{sellerProfile.school || 'Universiti Malaya (UM)'}</span>
                       </div>
                     </div>

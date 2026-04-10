@@ -20,6 +20,10 @@ const Auth = () => {
     const [error, setError] = useState('')
     const [successMessage, setSuccessMessage] = useState('')
 
+    // 新生注册模式状态
+    const [regType, setRegType] = useState('student') // 'student' | 'freshman'
+    const [offerFile, setOfferFile] = useState(null)
+
     // 学校选择状态（注册用）
     const [manualSchool, setManualSchool] = useState('')
     const [showSchoolPicker, setShowSchoolPicker] = useState(false)
@@ -66,8 +70,7 @@ const Auth = () => {
                 if (error) throw error
                 navigate('/home')
             } else if (mode === 'register') {
-                // 白名单验证：支持所有已知学校邮箱 + .edu.my
-                if (!isAllowedStudentEmail(email)) {
+                if (regType === 'student' && !isAllowedStudentEmail(email)) {
                     throw new Error(text.eduEmailRequired)
                 }
 
@@ -78,13 +81,35 @@ const Auth = () => {
                         : 'Please select your university')
                 }
 
+                if (regType === 'freshman' && !offerFile) {
+                    throw new Error(language === 'zh' ? '请上传Offer录取通知书图片' : 'Please upload your Offer image')
+                }
+
+                let finalOfferUrl = null
+                if (regType === 'freshman' && offerFile) {
+                    const fileExt = offerFile.name.split('.').pop()
+                    const fileName = `${Date.now()}_${Math.random().toString(36).substr(2, 9)}.${fileExt}`
+                    
+                    // 因为未登录，传到可匿名写入的 verification-offers 桶
+                    const { error: uploadError } = await supabase.storage
+                        .from('verification-offers')
+                        .upload(fileName, offerFile, { upsert: false })
+
+                    if (uploadError) {
+                        throw new Error(language === 'zh' ? `Offer图片上传失败: ${uploadError.message}` : `Failed to upload Offer: ${uploadError.message}`)
+                    }
+                    finalOfferUrl = fileName
+                }
+
                 const { error } = await supabase.auth.signUp({
                     email,
                     password,
                     options: {
                         data: {
                             full_name: fullName || email.split('@')[0],
-                            school: resolvedSchoolName
+                            school: resolvedSchoolName,
+                            is_freshman: regType === 'freshman',
+                            offer_url: finalOfferUrl
                         }
                     }
                 })
@@ -115,8 +140,8 @@ const Auth = () => {
         navigate('/home')
     }
 
-    // 邮箱后缀无法自动识别时需要手动选择
-    const needsManualSchool = mode === 'register' && email.includes('@') && !detectedSchool && isAllowedStudentEmail(email)
+    // 邮箱后缀无法自动识别或是新生模式时，都需要手动选择学校
+    const needsManualSchool = mode === 'register' && (regType === 'freshman' || (email.includes('@') && !detectedSchool && isAllowedStudentEmail(email)))
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 flex flex-col">
@@ -140,6 +165,26 @@ const Auth = () => {
                 {/* Form Card */}
                 <div className="w-full max-w-sm">
                     <form onSubmit={handleSubmit} className="bg-white rounded-3xl shadow-xl shadow-emerald-500/5 border border-gray-100 p-6 space-y-4">
+
+                        {/* Registration Type Toggle */}
+                        {mode === 'register' && (
+                            <div className="flex bg-slate-100 p-1 rounded-xl mb-4">
+                                <button
+                                    type="button"
+                                    onClick={() => setRegType('student')}
+                                    className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all ${regType === 'student' ? 'bg-white shadow text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    {language === 'zh' ? '在校生认证' : 'Student'}
+                                </button>
+                                <button
+                                    type="button"
+                                    onClick={() => setRegType('freshman')}
+                                    className={`flex-1 py-1.5 text-[11px] font-bold rounded-lg transition-all ${regType === 'freshman' ? 'bg-white shadow text-emerald-600' : 'text-slate-500 hover:text-slate-700'}`}
+                                >
+                                    {language === 'zh' ? '新生Offer认证' : 'Freshman'}
+                                </button>
+                            </div>
+                        )}
 
                         {/* Name field (register only) */}
                         {mode === 'register' && (
@@ -165,7 +210,7 @@ const Auth = () => {
                             <div className="space-y-1.5">
                                 <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">
                                     {mode === 'register'
-                                        ? (language === 'zh' ? '学生邮箱' : 'Student Email')
+                                        ? (regType === 'freshman' ? (language === 'zh' ? '个人邮箱' : 'Personal Email') : (language === 'zh' ? '学生邮箱' : 'Student Email'))
                                         : text.email}
                                 </label>
                                 <div className="relative">
@@ -175,7 +220,7 @@ const Auth = () => {
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
                                         placeholder={mode === 'register'
-                                            ? (language === 'zh' ? '输入你的学生邮箱 (.edu.my)' : 'Enter student email (.edu.my)')
+                                            ? (regType === 'freshman' ? (language === 'zh' ? '输入常用的个人邮箱' : 'Enter personal email') : (language === 'zh' ? '输入你的学生邮箱 (.edu.my)' : 'Enter student email (.edu.my)'))
                                             : text.emailInputPlaceholder}
                                         required
                                         className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-11 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
@@ -240,6 +285,21 @@ const Auth = () => {
                                                 className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-medium"
                                             />
                                         )}
+                                    </div>
+                                )}
+
+                                {/* Freshman Offer Upload */}
+                                {mode === 'register' && regType === 'freshman' && (
+                                    <div className="space-y-2 mt-4 p-3 bg-amber-50 rounded-xl border border-amber-100">
+                                        <label className="block text-[11px] font-bold text-amber-800">
+                                            {language === 'zh' ? '上传 Offer / 录取通知书' : 'Upload Offer Letter'}
+                                        </label>
+                                        <input
+                                            type="file"
+                                            accept="image/*"
+                                            onChange={(e) => setOfferFile(e.target.files[0])}
+                                            className="w-full text-[11px] text-amber-700 file:mr-3 file:py-1.5 file:px-3 file:rounded-full file:border-0 file:text-[11px] file:font-black file:bg-amber-100 file:text-amber-700 hover:file:bg-amber-200 file:transition-colors file:cursor-pointer"
+                                        />
                                     </div>
                                 )}
                             </div>
