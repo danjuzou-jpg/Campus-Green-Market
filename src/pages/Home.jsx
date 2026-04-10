@@ -3,7 +3,8 @@ import { Link, useNavigate } from 'react-router-dom'
 import { useMarketplace } from '../context/MarketplaceContext.jsx'
 import { SkeletonCard } from '../components/Skeleton.jsx'
 import { LOCATION_ALIASES } from '../lib/locations.js'
-import { Search, Menu, X, LayoutGrid, MonitorSmartphone, Sparkles, Sofa, BookOpen, Gamepad2, Building2, Package, MapPin } from 'lucide-react'
+import { MALAYSIAN_UNIVERSITIES } from '../lib/schools.js'
+import { Search, Menu, X, LayoutGrid, MonitorSmartphone, Sparkles, Sofa, BookOpen, Gamepad2, Building2, Package, GraduationCap } from 'lucide-react'
 
 const fmtDate = (ts, lang) => {
   const d = new Date(ts)
@@ -28,7 +29,8 @@ const Home = () => {
   const navigate = useNavigate()
   const [term, setTerm] = useState('')
   const [activeCat, setActiveCat] = useState('All')
-  const [activeLoc, setActiveLoc] = useState('All Locations')
+  const [activeSchool, setActiveSchool] = useState('All Schools')
+  const [activeListingType, setActiveListingType] = useState('idle') // 'idle' | 'rental'
   const [distance, setDistance] = useState('Any')
   const [toast, setToast] = useState('')
   const [isSidebarOpen, setIsSidebarOpen] = useState(false)
@@ -116,7 +118,6 @@ const Home = () => {
         const escapeRegExp = string => string.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
         const regex = new RegExp(escapeRegExp(matchedAlias), 'i');
         processedTerm = processedTerm.replace(regex, '').trim();
-        setActiveLoc(foundOfficialLoc);
       }
 
       saveSearchTerm(q)
@@ -131,11 +132,13 @@ const Home = () => {
       const more = await fetchProducts(session?.user?.id, {
         page: 1,
         searchTerm: appliedTerm,
-        categoryFilter: activeCat,
-        locationFilter: activeLoc,
+        categoryFilter: activeListingType === 'rental' ? 'Rentals' : activeCat,
+        locationFilter: 'All Locations',
         userLat: userLocation?.lat,
         userLng: userLocation?.lng,
-        maxDistanceKm: distance
+        maxDistanceKm: distance,
+        schoolFilter: activeSchool === 'All Schools' ? null : activeSchool,
+        listingTypeFilter: activeListingType
       })
       if (mounted) {
         setHasMore(more)
@@ -144,7 +147,7 @@ const Home = () => {
     }
     doFetch()
     return () => { mounted = false }
-  }, [appliedTerm, activeCat, activeLoc, distance, userLocation, fetchProducts, session])
+  }, [appliedTerm, activeCat, activeSchool, activeListingType, distance, userLocation, fetchProducts, session])
 
   const loadMore = async () => {
     if (!hasMore || loading.products) return
@@ -152,11 +155,13 @@ const Home = () => {
     const more = await fetchProducts(session?.user?.id, {
       page: nextPage,
       searchTerm: appliedTerm,
-      categoryFilter: activeCat,
-      locationFilter: activeLoc,
+      categoryFilter: activeListingType === 'rental' ? 'Rentals' : activeCat,
+      locationFilter: 'All Locations',
       userLat: userLocation?.lat,
       userLng: userLocation?.lng,
-      maxDistanceKm: distance
+      maxDistanceKm: distance,
+      schoolFilter: activeSchool === 'All Schools' ? null : activeSchool,
+      listingTypeFilter: activeListingType
     })
     setHasMore(more)
     setPage(nextPage)
@@ -241,7 +246,7 @@ const Home = () => {
         </div>
       </div>
 
-      {/* Categories Drawer Overlay */}
+      {/* School Filter Drawer */}
       {isSidebarOpen && (
         <div className="fixed inset-0 z-[100] flex">
           {/* Backdrop */}
@@ -253,7 +258,7 @@ const Home = () => {
           {/* Drawer */}
           <div className="relative w-72 h-full bg-white/95 backdrop-blur-xl shadow-2xl border-r border-white/60 flex flex-col transform transition-transform duration-300">
             <div className="p-6 flex items-center justify-between border-b border-slate-100">
-              <h2 className="text-xl font-black text-slate-800 tracking-tight">{language === 'zh' ? '选择地点' : 'Select Location'}</h2>
+              <h2 className="text-xl font-black text-slate-800 tracking-tight">{language === 'zh' ? '选择学校' : 'Select School'}</h2>
               <button
                 onClick={() => setIsSidebarOpen(false)}
                 className="p-2 rounded-full hover:bg-slate-100 active:bg-slate-200 text-slate-400 transition-colors"
@@ -263,22 +268,33 @@ const Home = () => {
             </div>
             <div className="p-4 flex-1 overflow-y-auto">
               <div className="flex flex-col gap-2">
-                {locations.map((loc) => {
-                  const isSelected = activeLoc === loc
+                {/* All Schools */}
+                <button
+                  onClick={() => { setActiveSchool('All Schools'); setIsSidebarOpen(false) }}
+                  className={`flex items-center gap-4 w-full p-3 rounded-2xl transition-all active:scale-95 ${activeSchool === 'All Schools' ? 'bg-teal-50 text-teal-700 shadow-sm border border-teal-100/50' : 'hover:bg-slate-50 text-slate-600 border border-transparent'}`}
+                >
+                  <div className={`w-10 h-10 shrink-0 rounded-[12px] flex items-center justify-center shadow-sm overflow-hidden ${activeSchool === 'All Schools' ? 'bg-white text-teal-600' : 'bg-slate-100 text-slate-500'}`}>
+                    <LayoutGrid size={20} />
+                  </div>
+                  <span className="font-bold text-[14px]">
+                    {language === 'zh' ? '全部学校' : 'All Schools'}
+                  </span>
+                </button>
+
+                {/* University list */}
+                {MALAYSIAN_UNIVERSITIES.map((uni) => {
+                  const isSelected = activeSchool === uni.en
                   return (
                     <button
-                      key={loc}
-                      onClick={() => {
-                        setActiveLoc(loc)
-                        setIsSidebarOpen(false)
-                      }}
+                      key={uni.key}
+                      onClick={() => { setActiveSchool(uni.en); setIsSidebarOpen(false) }}
                       className={`flex items-center gap-4 w-full p-3 rounded-2xl transition-all active:scale-95 ${isSelected ? 'bg-teal-50 text-teal-700 shadow-sm border border-teal-100/50' : 'hover:bg-slate-50 text-slate-600 border border-transparent'}`}
                     >
                       <div className={`w-10 h-10 shrink-0 rounded-[12px] flex items-center justify-center shadow-sm overflow-hidden ${isSelected ? 'bg-white text-teal-600' : 'bg-slate-100 text-slate-500'}`}>
-                        {loc === 'All Locations' ? <LayoutGrid size={20} /> : <MapPin size={20} />}
+                        <GraduationCap size={20} />
                       </div>
-                      <span className="font-bold text-[14px]">
-                        {loc === 'All Locations' ? t.allLocations || 'All Locations' : loc}
+                      <span className="font-bold text-[13px] leading-snug text-left">
+                        {language === 'zh' ? uni.zh : uni.en}
                       </span>
                     </button>
                   )
@@ -289,7 +305,33 @@ const Home = () => {
         </div>
       )}
 
-      {/* Filter and Location Pills (Simplified) */}
+      {/* Idle / Rental top-level tabs */}
+      <div className="px-6 pb-3 flex items-center gap-3">
+        <button
+          onClick={() => { setActiveListingType('idle'); setActiveCat('All') }}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-black transition-all shadow-sm ${
+            activeListingType === 'idle'
+              ? 'bg-emerald-500 text-white shadow-[0_4px_12px_rgba(16,185,129,0.3)]'
+              : 'bg-white text-slate-500 hover:bg-slate-50'
+          }`}
+        >
+          <Package size={14} />
+          {language === 'zh' ? '闲置' : 'Idle Items'}
+        </button>
+        <button
+          onClick={() => { setActiveListingType('rental'); setActiveCat('All') }}
+          className={`flex items-center gap-2 px-5 py-2.5 rounded-full text-xs font-black transition-all shadow-sm ${
+            activeListingType === 'rental'
+              ? 'bg-amber-500 text-white shadow-[0_4px_12px_rgba(245,158,11,0.3)]'
+              : 'bg-white text-slate-500 hover:bg-slate-50'
+          }`}
+        >
+          <Building2 size={14} />
+          {language === 'zh' ? '租房' : 'Rentals'}
+        </button>
+      </div>
+
+      {/* Filter and Category Pills */}
       <div className="px-6 pb-4 flex items-center gap-3 overflow-x-auto scrollbar-hide">
         <div className="relative shrink-0">
           <select
@@ -313,14 +355,16 @@ const Home = () => {
             <svg xmlns="http://www.w3.org/2000/svg" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="3" strokeLinecap="round" strokeLinejoin="round" className="text-slate-400"><path d="m6 9 6 6 6-6" /></svg>
           </div>
         </div>
-        {categories.map(cat => (
+        {/* Category pills: only show for idle mode */}
+        {activeListingType === 'idle' && categories.filter(c => c.key !== 'Rentals').map(cat => (
           <button
             key={cat.key}
             onClick={() => setActiveCat(cat.key)}
-            className={`px-5 py-2.5 rounded-full text-xs font-bold transition-all shadow-sm whitespace-nowrap flex items-center gap-2 ${activeCat === cat.key
-              ? 'bg-[#10b981] text-white shadow-[0_4px_12px_rgba(16,185,129,0.3)]'
-              : 'bg-white text-slate-500 hover:bg-slate-50'
-              }`}
+            className={`px-5 py-2.5 rounded-full text-xs font-bold transition-all shadow-sm whitespace-nowrap flex items-center gap-2 ${
+              activeCat === cat.key
+                ? 'bg-emerald-500 text-white shadow-[0_4px_12px_rgba(16,185,129,0.3)]'
+                : 'bg-white text-slate-500 hover:bg-slate-50'
+            }`}
           >
             {cat.key === 'All' && <LayoutGrid size={14} />}
             {cat.key === 'Digital' && <MonitorSmartphone size={14} />}
@@ -328,12 +372,31 @@ const Home = () => {
             {cat.key === 'Home' && <Sofa size={14} />}
             {cat.key === 'Learning' && <BookOpen size={14} />}
             {cat.key === 'Hobbies' && <Gamepad2 size={14} />}
-            {cat.key === 'Rentals' && <Building2 size={14} />}
             {cat.key === 'Others' && <Package size={14} />}
             <span>{language === 'zh' ? cat.zh : cat.en}</span>
           </button>
         ))}
       </div>
+
+      {/* Active school indicator */}
+      {activeSchool !== 'All Schools' && (
+        <div className="px-6 pb-3">
+          <div className="flex items-center gap-2 bg-teal-50 rounded-2xl px-4 py-2.5 border border-teal-100/50">
+            <GraduationCap size={14} className="text-teal-600 shrink-0" />
+            <span className="text-xs font-bold text-teal-700 flex-1 truncate">
+              {language === 'zh'
+                ? MALAYSIAN_UNIVERSITIES.find(u => u.en === activeSchool)?.zh || activeSchool
+                : activeSchool}
+            </span>
+            <button
+              onClick={() => setActiveSchool('All Schools')}
+              className="text-teal-400 hover:text-teal-600 p-0.5 rounded-full transition-colors"
+            >
+              <X size={14} />
+            </button>
+          </div>
+        </div>
+      )}
 
       {/* Product Grid */}
       <div className="px-6">

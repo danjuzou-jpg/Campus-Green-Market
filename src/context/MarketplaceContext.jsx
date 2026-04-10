@@ -1,6 +1,7 @@
 import React, { createContext, useContext, useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import { supabase } from '../lib/supabaseClient'
 import { POPULAR_LOCATIONS } from '../lib/locations.js'
+import { detectSchoolFromEmail } from '../lib/schools.js'
 
 const MarketplaceContext = createContext(null)
 
@@ -35,7 +36,10 @@ const mapDBProduct = (p, currentUserId) => ({
   tags: p.tags || [],
   currency: p.currency || 'MYR',
   owner: currentUserId && currentUserId === p.owner_id ? 'me' : 'others',
-  owner_id: p.owner_id
+  owner_id: p.owner_id,
+  listingType: p.listing_type || 'idle',
+  roomType: p.room_type || null,
+  availableFrom: p.available_from || null
 })
 
 export const MarketplaceProvider = ({ children }) => {
@@ -243,7 +247,7 @@ export const MarketplaceProvider = ({ children }) => {
       newPasswordSubtitle: 'Please enter your new password',
       updatePassword: 'Update Password',
       passwordUpdated: 'Password updated successfully! Please log in.',
-      eduEmailRequired: 'Only Malaysian university emails (.edu.my) are allowed. Please use your campus email.',
+      eduEmailRequired: 'Only verified student emails are allowed. Please use your university campus email.',
     },
     zh: {
       // 导航
@@ -400,7 +404,7 @@ export const MarketplaceProvider = ({ children }) => {
       newPasswordSubtitle: '请输入您的新密码',
       updatePassword: '更新密码',
       passwordUpdated: '密码更新成功，请使用新密码登录！',
-      eduEmailRequired: '仅限马来西亚大学校园邮箱（.edu.my）注册，请使用你的校园邮箱。',
+      eduEmailRequired: '仅限学生邮箱注册，请使用你的大学校园邮箱。',
     }
   }), [])
 
@@ -475,10 +479,16 @@ export const MarketplaceProvider = ({ children }) => {
         .single()
 
       if (data) {
+        // Auto-fill school from email if profile has no school set
+        const schoolName = data.school || detectSchoolFromEmail(data.email)?.en || 'Unknown University'
+        if (!data.school && schoolName !== 'Unknown University') {
+          // Background update: fill in school for existing users
+          supabase.from('profiles').update({ school: schoolName }).eq('id', userId).then()
+        }
         setUser({
           id: data.id,
           name: data.full_name || data.email?.split('@')[0] || 'User',
-          school: data.school || 'Universiti Malaya (UM)',
+          school: schoolName,
           verified: data.verification_status === 'verified',
           verificationStatus: data.verification_status || 'unverified',
           avatar: data.avatar_url || '/default-avatar.svg',
@@ -486,13 +496,18 @@ export const MarketplaceProvider = ({ children }) => {
         })
       } else if (error && (error.code === 'PGRST116' || error.details?.includes('0 rows'))) {
         // Profile doesn't exist, create it
+        // Use user_metadata from signUp (school, full_name) if available
+        const userMeta = session?.user?.user_metadata || {}
+        const schoolFromMeta = userMeta.school || detectSchoolFromEmail(session?.user?.email)?.en || 'Unknown University'
+        const nameFromMeta = userMeta.full_name || session?.user?.email?.split('@')[0] || 'User'
+
         const { data: newProfile, error: insertError } = await supabase
           .from('profiles')
           .insert({
             id: userId,
             email: session?.user?.email,
-            full_name: session?.user?.email?.split('@')[0] || 'User',
-            school: session?.user?.email?.toLowerCase().endsWith('.edu.my') ? 'Universiti Malaya (UM)' : 'Unknown University',
+            full_name: nameFromMeta,
+            school: schoolFromMeta,
             verification_status: 'unverified'
           })
           .select()
@@ -548,10 +563,27 @@ export const MarketplaceProvider = ({ children }) => {
     locationFilter = 'All Locations',
     userLat = null,
     userLng = null,
-    maxDistanceKm = null
+    maxDistanceKm = null,
+    schoolFilter = null,
+    listingTypeFilter = null  // 'idle' | 'rental' | null (all)
   } = {}) => {
     setLoading(prev => ({ ...prev, products: true }))
     try {
+      // If school filter is active, first get matching user IDs
+      let schoolOwnerIds = null
+      if (schoolFilter) {
+        const { data: schoolProfiles } = await supabase
+          .from('profiles')
+          .select('id')
+          .eq('school', schoolFilter)
+        schoolOwnerIds = (schoolProfiles || []).map(p => p.id)
+        if (schoolOwnerIds.length === 0) {
+          // No users from this school → empty result
+          setListings(prev => page === 1 ? [] : prev)
+          return false
+        }
+      }
+
       const { data, error } = await supabase.rpc('search_products', {
         search_term: searchTerm,
         category_filter: categoryFilter,
@@ -569,11 +601,22 @@ export const MarketplaceProvider = ({ children }) => {
         let q = supabase.from('products').select('*').order('created_at', { ascending: false }).range((page - 1) * limit, page * limit - 1)
         if (categoryFilter !== 'All') q = q.eq('category', categoryFilter)
 
+        // School filter: restrict to owners from selected school
+        if (schoolOwnerIds) {
+          q = q.in('owner_id', schoolOwnerIds)
+        }
+
+        // Listing type filter (idle vs rental)
+        if (listingTypeFilter === 'rental') {
+          q = q.eq('listing_type', 'rental')
+        } else if (listingTypeFilter === 'idle') {
+          // idle: where listing_type is 'idle' OR listing_type is null (legacy items)
+          q = q.or('listing_type.eq.idle,listing_type.is.null')
+        }
+
         // Multi-keyword fuzzy search fallback
         if (searchTerm) {
           const keywords = searchTerm.trim().split(/\s+/).filter(Boolean)
-          // 安全修复 (P2-6): 转义 PostgREST 过滤字符串中的特殊字符，
-          // 防止用户通过输入 % _ , . 等字符操纵查询语法
           const escapePostgrest = (str) => str.replace(/[%_,.]/g, '\\$&')
           keywords.forEach(kw => {
             const safeKw = escapePostgrest(kw)
@@ -590,7 +633,19 @@ export const MarketplaceProvider = ({ children }) => {
         return fallbackData.length >= limit
       }
 
-      const mapped = data.map(p => mapDBProduct(p, currentUserId))
+      let filtered = data
+      // Post-filter by school if RPC doesn't support it
+      if (schoolOwnerIds) {
+        filtered = filtered.filter(p => schoolOwnerIds.includes(p.owner_id))
+      }
+      // Post-filter by listing type
+      if (listingTypeFilter === 'rental') {
+        filtered = filtered.filter(p => p.listing_type === 'rental')
+      } else if (listingTypeFilter === 'idle') {
+        filtered = filtered.filter(p => !p.listing_type || p.listing_type === 'idle')
+      }
+
+      const mapped = filtered.map(p => mapDBProduct(p, currentUserId))
       setListings(prev => page === 1 ? mapped : [...prev, ...mapped.filter(n => !prev.some(o => o.id === n.id))])
       return data.length >= limit
     } catch (err) {
@@ -639,7 +694,8 @@ export const MarketplaceProvider = ({ children }) => {
             id,
             content,
             sender_id,
-            created_at
+            created_at,
+            is_withdrawn
           )
         `)
         // Limit to 50 latest messages to prevent memory overflow.
@@ -669,9 +725,10 @@ export const MarketplaceProvider = ({ children }) => {
             otherUserId: isBuyer ? c.seller_id : c.buyer_id,
             messages: c.messages.map(m => ({
               id: m.id,
-              text: m.content,
+              text: m.is_withdrawn ? '' : m.content,
               sender: m.sender_id === userId ? 'me' : 'other',
-              timestamp: new Date(m.created_at).getTime()
+              timestamp: new Date(m.created_at).getTime(),
+              is_withdrawn: m.is_withdrawn || false
             })).sort((a, b) => a.timestamp - b.timestamp),
             lastMessage: c.last_message,
             lastTimestamp: new Date(c.updated_at).getTime(),
@@ -686,7 +743,7 @@ export const MarketplaceProvider = ({ children }) => {
     }
   }, [])
 
-  const addListing = useCallback(async ({ title, price, images, description, whatsapp, wechat, instagram, locationName, lat, lng, category, tags = [], currency = 'MYR' }) => {
+  const addListing = useCallback(async ({ title, price, images, description, whatsapp, wechat, instagram, locationName, lat, lng, category, tags = [], currency = 'MYR', listingType = 'idle', roomType = null, availableFrom = null }) => {
     if (!session?.user) {
       showToast('error', language === 'zh' ? '请先登录' : 'Please login first')
       return null
@@ -734,7 +791,10 @@ export const MarketplaceProvider = ({ children }) => {
         lat,
         lng,
         owner_id: session.user.id,
-        contact_info: { whatsapp, wechat, instagram }
+        contact_info: { whatsapp, wechat, instagram },
+        listing_type: listingType,
+        room_type: roomType,
+        available_from: availableFrom
       }
 
       const { data, error } = await supabase
@@ -1290,23 +1350,43 @@ export const MarketplaceProvider = ({ children }) => {
 
   // 实时新消息：只追加到对应会话，避免全量 fetchConversations
   const addIncomingMessage = useCallback((conversationId, rawMsg) => {
+    // If _update flag is set, replace existing message in-place (e.g. for withdrawal)
+    if (rawMsg._update) {
+      setConversations(prev => prev.map(c => {
+        if (c.id !== conversationId) return c
+        return {
+          ...c,
+          messages: c.messages.map(m => m.id === rawMsg.id
+            ? {
+              ...m,
+              text: rawMsg.content || '',
+              is_withdrawn: rawMsg.is_withdrawn || false
+            }
+            : m
+          )
+        }
+      }))
+      return
+    }
+
     const newMsg = {
       id: rawMsg.id,
       text: rawMsg.content,
       sender: 'other',
-      timestamp: new Date(rawMsg.created_at).getTime()
+      timestamp: new Date(rawMsg.created_at).getTime(),
+      is_withdrawn: rawMsg.is_withdrawn || false
     }
     setConversations(prev => prev.map(c => {
       if (c.id !== conversationId) return c
       return {
         ...c,
         messages: [...c.messages, newMsg],
-        lastMessage: rawMsg.content,
+        lastMessage: rawMsg.is_withdrawn ? (rawMsg.sender_id === session?.user?.id ? '你撤回了一条消息' : '消息已撤回') : rawMsg.content,
         lastTimestamp: new Date(rawMsg.created_at).getTime(),
         unreadCount: markingReadRef.current.has(conversationId) ? 0 : (c.unreadCount || 0) + 1
       }
     }))
-  }, [])
+  }, [session?.user?.id])
 
   const unreadCount = useMemo(() => {
     return conversations.reduce((total, conv) => total + (conv.unreadCount || 0), 0)

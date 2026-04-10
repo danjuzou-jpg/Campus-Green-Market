@@ -1,9 +1,10 @@
-import React, { useState } from 'react'
+import React, { useState, useMemo } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { supabase } from '../lib/supabaseClient'
 import { useMarketplace } from '../context/MarketplaceContext.jsx'
+import { MALAYSIAN_UNIVERSITIES, detectSchoolFromEmail, isAllowedStudentEmail } from '../lib/schools.js'
 import Logo from '../components/Logo'
-import { Mail, Lock, User, ArrowRight, Eye, EyeOff } from 'lucide-react'
+import { Mail, Lock, User, ArrowRight, Eye, EyeOff, School, ChevronDown } from 'lucide-react'
 
 const Auth = () => {
     const navigate = useNavigate()
@@ -19,6 +20,11 @@ const Auth = () => {
     const [error, setError] = useState('')
     const [successMessage, setSuccessMessage] = useState('')
 
+    // 学校选择状态（注册用）
+    const [manualSchool, setManualSchool] = useState('')
+    const [showSchoolPicker, setShowSchoolPicker] = useState(false)
+    const [customSchoolName, setCustomSchoolName] = useState('')
+
     React.useEffect(() => {
         // Detect if coming from a password recovery link
         const hash = window.location.hash
@@ -26,6 +32,23 @@ const Auth = () => {
             setMode('update')
         }
     }, [])
+
+    // 根据邮箱后缀自动检测学校
+    const detectedSchool = useMemo(() => {
+        if (mode !== 'register' || !email) return null
+        return detectSchoolFromEmail(email)
+    }, [email, mode])
+
+    // 最终的学校名称（用于注册写入 profiles.school）
+    const resolvedSchoolName = useMemo(() => {
+        if (detectedSchool) return detectedSchool.en
+        if (manualSchool === 'Other') return customSchoolName.trim() || 'Unknown University'
+        if (manualSchool) {
+            const uni = MALAYSIAN_UNIVERSITIES.find(u => u.key === manualSchool)
+            return uni ? uni.en : manualSchool
+        }
+        return ''
+    }, [detectedSchool, manualSchool, customSchoolName])
 
     const handleSubmit = async (e) => {
         e.preventDefault()
@@ -43,16 +66,25 @@ const Auth = () => {
                 if (error) throw error
                 navigate('/home')
             } else if (mode === 'register') {
-                // 校园邮箱域名限制：仅允许 .edu.my 邮箱注册
-                if (!email.toLowerCase().endsWith('.edu.my')) {
+                // 白名单验证：支持所有已知学校邮箱 + .edu.my
+                if (!isAllowedStudentEmail(email)) {
                     throw new Error(text.eduEmailRequired)
                 }
+
+                // 学校必须确定（自动检测到 或 手动选择了）
+                if (!resolvedSchoolName) {
+                    throw new Error(language === 'zh'
+                        ? '请选择你的学校'
+                        : 'Please select your university')
+                }
+
                 const { error } = await supabase.auth.signUp({
                     email,
                     password,
                     options: {
                         data: {
-                            full_name: fullName || email.split('@')[0]
+                            full_name: fullName || email.split('@')[0],
+                            school: resolvedSchoolName
                         }
                     }
                 })
@@ -82,6 +114,9 @@ const Auth = () => {
         localStorage.setItem('hasVisited', 'true')
         navigate('/home')
     }
+
+    // 邮箱后缀无法自动识别时需要手动选择
+    const needsManualSchool = mode === 'register' && email.includes('@') && !detectedSchool && isAllowedStudentEmail(email)
 
     return (
         <div className="min-h-screen bg-gradient-to-br from-emerald-50 via-white to-teal-50 flex flex-col">
@@ -129,7 +164,9 @@ const Auth = () => {
                         {mode !== 'update' && (
                             <div className="space-y-1.5">
                                 <label className="block text-[10px] font-bold text-gray-400 uppercase tracking-wider ml-1">
-                                    {text.email}
+                                    {mode === 'register'
+                                        ? (language === 'zh' ? '学生邮箱' : 'Student Email')
+                                        : text.email}
                                 </label>
                                 <div className="relative">
                                     <Mail size={16} className="absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" />
@@ -137,11 +174,74 @@ const Auth = () => {
                                         type="email"
                                         value={email}
                                         onChange={(e) => setEmail(e.target.value)}
-                                        placeholder={text.emailInputPlaceholder}
+                                        placeholder={mode === 'register'
+                                            ? (language === 'zh' ? '输入你的学生邮箱 (.edu.my)' : 'Enter student email (.edu.my)')
+                                            : text.emailInputPlaceholder}
                                         required
                                         className="w-full bg-gray-50 border border-gray-200 rounded-xl pl-11 pr-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all"
                                     />
                                 </div>
+
+                                {/* 自动检测到学校的显示 */}
+                                {mode === 'register' && detectedSchool && (
+                                    <div className="flex items-center gap-2 px-3 py-2 bg-emerald-50 rounded-xl border border-emerald-100 mt-1">
+                                        <School size={14} className="text-emerald-600 shrink-0" />
+                                        <span className="text-xs font-bold text-emerald-700">
+                                            {language === 'zh' ? detectedSchool.zh : detectedSchool.en}
+                                        </span>
+                                        <span className="text-[10px] text-emerald-500 ml-auto">
+                                            {language === 'zh' ? '✓ 自动识别' : '✓ Auto-detected'}
+                                        </span>
+                                    </div>
+                                )}
+
+                                {/* 手动选择学校（邮箱后缀匹配不到已知学校时） */}
+                                {needsManualSchool && (
+                                    <div className="space-y-2 mt-1">
+                                        <div className="flex items-center gap-2 px-3 py-2 bg-amber-50 rounded-xl border border-amber-100">
+                                            <School size={14} className="text-amber-600 shrink-0" />
+                                            <span className="text-[11px] font-medium text-amber-700">
+                                                {language === 'zh'
+                                                    ? '未能自动识别学校，请手动选择'
+                                                    : 'School not auto-detected. Please select manually'}
+                                            </span>
+                                        </div>
+                                        <div className="relative">
+                                            <select
+                                                value={manualSchool}
+                                                onChange={(e) => {
+                                                    setManualSchool(e.target.value)
+                                                    if (e.target.value !== 'Other') setCustomSchoolName('')
+                                                }}
+                                                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all appearance-none font-medium"
+                                            >
+                                                <option value="">
+                                                    {language === 'zh' ? '— 选择学校 —' : '— Select University —'}
+                                                </option>
+                                                {MALAYSIAN_UNIVERSITIES.map(uni => (
+                                                    <option key={uni.key} value={uni.key}>
+                                                        {language === 'zh' ? uni.zh : uni.en}
+                                                    </option>
+                                                ))}
+                                                <option value="Other">
+                                                    {language === 'zh' ? '其他 / Other' : 'Other'}
+                                                </option>
+                                            </select>
+                                            <ChevronDown size={14} className="absolute right-4 top-1/2 -translate-y-1/2 pointer-events-none text-gray-400" />
+                                        </div>
+
+                                        {/* 选择 Other 时手动输入学校名 */}
+                                        {manualSchool === 'Other' && (
+                                            <input
+                                                type="text"
+                                                value={customSchoolName}
+                                                onChange={(e) => setCustomSchoolName(e.target.value)}
+                                                placeholder={language === 'zh' ? '输入你的学校全名' : 'Enter your university name'}
+                                                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent transition-all font-medium"
+                                            />
+                                        )}
+                                    </div>
+                                )}
                             </div>
                         )}
 

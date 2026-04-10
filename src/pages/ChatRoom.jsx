@@ -1,9 +1,11 @@
-import React, { useState, useRef, useEffect } from 'react'
+import React, { useState, useRef, useEffect, useCallback } from 'react'
 import { useParams, useNavigate, useSearchParams } from 'react-router-dom'
 import { useMarketplace } from '../context/MarketplaceContext'
 import { supabase } from '../lib/supabaseClient'
-import { ChevronLeft, Send, Flag } from 'lucide-react'
+import { ChevronLeft, Send, Flag, RotateCcw } from 'lucide-react'
 import ReportModal from '../components/ReportModal.jsx'
+
+const WITHDRAW_LIMIT_MS = 2 * 60 * 1000 // 2 minutes
 
 const ChatRoom = () => {
   const { id } = useParams()
@@ -14,6 +16,10 @@ const ChatRoom = () => {
   const [inputText, setInputText] = useState('')
   const [showReport, setShowReport] = useState(false)
   const scrollRef = useRef(null)
+
+  // 撤回菜单状态
+  const [withdrawMenuId, setWithdrawMenuId] = useState(null)
+  const longPressTimer = useRef(null)
 
   // 是否是新会话（还未在 DB 中创建）
   const isNewConversation = id === 'new'
@@ -29,7 +35,7 @@ const ChatRoom = () => {
   const formatLastSeen = (date) => {
     if (!date) return ''
     const diff = Math.floor((Date.now() - new Date(date).getTime()) / 1000)
-    if (diff < 300) return language === 'zh' ? '刚刚活跃' : 'Active just now'
+    if (diff < 300) return language === 'zh' ? '🟢 在线' : '🟢 Online'
     if (diff < 3600) return language === 'zh' ? `${Math.floor(diff / 60)} 分钟前活跃` : `Active ${Math.floor(diff / 60)}m ago`
     if (diff < 86400) return language === 'zh' ? `${Math.floor(diff / 3600)} 小时前活跃` : `Active ${Math.floor(diff / 3600)}h ago`
     return language === 'zh' ? `${Math.floor(diff / 86400)} 天前活跃` : `Active ${Math.floor(diff / 86400)}d ago`
@@ -79,7 +85,6 @@ const ChatRoom = () => {
   }, [isNewConversation, conv?.otherUserId])
 
   // Fix 1-4: Viewport Height Fix for mobile keyboards
-  // 追踪 visualViewport 的 offsetTop（键盘弹起时布局视口与视觉视口的偏移）和 height
   const [isMobile, setIsMobile] = useState(window.innerWidth < 768)
   const [vp, setVp] = useState({
     top: window.visualViewport?.offsetTop ?? 0,
@@ -95,7 +100,6 @@ const ChatRoom = () => {
         height: vv ? vv.height : window.innerHeight
       })
     }
-    // Fix 3: 同时监听 resize 和 scroll，iOS 键盘弹起会同时触发两者
     window.visualViewport?.addEventListener('resize', update)
     window.visualViewport?.addEventListener('scroll', update)
     window.addEventListener('resize', update)
@@ -106,19 +110,19 @@ const ChatRoom = () => {
     }
   }, [])
 
-  // Fix 5: 消息更新 或 键盘弹起（vp.height 变化）时都滚底
+  // 消息更新 或 键盘弹起时滚底
   useEffect(() => {
     if (scrollRef.current) {
       scrollRef.current.scrollTop = scrollRef.current.scrollHeight
     }
   }, [conv?.messages, vp.height])
 
-  // 标记已读（仅已存在的会话）
+  // 标记已读
   useEffect(() => {
     if (id && !isNewConversation) markConversationRead(id)
   }, [id, isNewConversation, conv?.messages?.length])
 
-  // Real-time subscription（仅已存在的会话）
+  // Real-time subscription: INSERT + UPDATE (for withdraw)
   useEffect(() => {
     if (!id || isNewConversation || !session?.user) return
     const channel = supabase
@@ -131,15 +135,64 @@ const ChatRoom = () => {
       }, (payload) => {
         const msg = payload.new
         if (msg.sender_id !== session.user.id) {
-          // 局部追加，避免全量重载所有会话
           addIncomingMessage(id, msg)
         }
+      })
+      .on('postgres_changes', {
+        event: 'UPDATE',
+        schema: 'public',
+        table: 'messages',
+        filter: `conversation_id=eq.${id}`
+      }, (payload) => {
+        const updated = payload.new
+        // Apply ALL updates in-place for BOTH sender and receiver (cross-device withdrawal sync)
+        addIncomingMessage(id, { ...updated, _update: true })
       })
       .subscribe()
 
     return () => { supabase.removeChannel(channel) }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [id, isNewConversation, session?.user?.id, addIncomingMessage])
+
+  // 关闭撤回菜单的全局点击
+  useEffect(() => {
+    if (!withdrawMenuId) return
+    const close = () => setWithdrawMenuId(null)
+    document.addEventListener('click', close)
+    return () => document.removeEventListener('click', close)
+  }, [withdrawMenuId])
+
+  // 撤回消息
+  const handleWithdraw = async (msg) => {
+    setWithdrawMenuId(null)
+    const { error } = await supabase
+      .from('messages')
+      .update({ is_withdrawn: true, content: '' })
+      .eq('id', msg.id)
+      .eq('sender_id', session.user.id) // 安全：仅能撤回自己的
+    if (error) {
+      showToast('error', language === 'zh' ? '撤回失败' : 'Withdraw failed')
+    } else {
+      // Optimistic UI update
+      addIncomingMessage(id, { ...msg, is_withdrawn: true, content: '', _update: true })
+    }
+  }
+
+  // 长按开始/结束
+  const onTouchStart = (msg) => {
+    if (msg.sender !== 'me' || msg.is_withdrawn) return
+    const elapsed = Date.now() - new Date(msg.timestamp).getTime()
+    if (elapsed > WITHDRAW_LIMIT_MS) return
+    longPressTimer.current = setTimeout(() => {
+      setWithdrawMenuId(msg.id)
+    }, 600) // 600ms 长按触发
+  }
+  const onTouchEnd = () => {
+    if (longPressTimer.current) {
+      clearTimeout(longPressTimer.current)
+      longPressTimer.current = null
+    }
+  }
 
   // 新会话且缺少 productId 参数 → 无效访问
   if (isNewConversation && !productIdFromQuery) {
@@ -166,7 +219,6 @@ const ChatRoom = () => {
     if (!inputText.trim() || sending) return
 
     if (isNewConversation && product) {
-      // 延迟创建：第一条消息发送时才创建会话
       setSending(true)
       const realConvId = await createConversationWithMessage(product, inputText)
       setSending(false)
@@ -174,7 +226,6 @@ const ChatRoom = () => {
         setInputText('')
         navigate(`/chat/${realConvId}`, { replace: true })
       } else {
-        // Fix 9: 发送失败时给用户明确提示
         showToast('error', language === 'zh' ? '发送失败，请重试' : 'Failed to send. Please try again.')
       }
     } else {
@@ -207,6 +258,12 @@ const ChatRoom = () => {
     const month = (date.getMonth() + 1).toString().padStart(2, '0')
     const day = date.getDate().toString().padStart(2, '0')
     return `${month}/${day} ${timeStr}`
+  }
+
+  // 检查消息是否可撤回（自己的消息且在2分钟内）
+  const canWithdraw = (msg) => {
+    if (msg.sender !== 'me' || msg.is_withdrawn) return false
+    return (Date.now() - new Date(msg.timestamp).getTime()) <= WITHDRAW_LIMIT_MS
   }
 
   return (
@@ -263,16 +320,55 @@ const ChatRoom = () => {
         </div>
 
         {messages.map((msg) => (
-          <div key={msg.id} className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'}`}>
-            <div className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm shadow-sm ${msg.sender === 'me'
-              ? 'bg-indigo-600 text-white rounded-tr-none'
-              : 'bg-white text-gray-800 rounded-tl-none border border-gray-100'
-              }`}>
-              {msg.text}
-              <div className={`text-[10px] mt-1 ${msg.sender === 'me' ? 'text-indigo-200' : 'text-gray-400'}`}>
-                {formatMessageTime(msg.timestamp)}
-              </div>
+          <div key={msg.id} className={`flex ${msg.sender === 'me' ? 'justify-end' : 'justify-start'} relative`}>
+            <div
+              className={`max-w-[80%] rounded-2xl px-4 py-2 text-sm shadow-sm relative ${
+                msg.is_withdrawn
+                  ? 'bg-gray-100 text-gray-400 italic border border-gray-200'
+                  : msg.sender === 'me'
+                    ? 'bg-indigo-600 text-white rounded-tr-none'
+                    : 'bg-white text-gray-800 rounded-tl-none border border-gray-100'
+              }`}
+              onTouchStart={() => onTouchStart(msg)}
+              onTouchEnd={onTouchEnd}
+              onTouchCancel={onTouchEnd}
+              onContextMenu={(e) => {
+                if (canWithdraw(msg)) {
+                  e.preventDefault()
+                  setWithdrawMenuId(msg.id)
+                }
+              }}
+            >
+              {msg.is_withdrawn ? (
+                <span className="flex items-center gap-1.5">
+                  <RotateCcw size={12} />
+                  {language === 'zh' ? '该消息已撤回' : 'This message was withdrawn'}
+                </span>
+              ) : (
+                msg.text
+              )}
+              {!msg.is_withdrawn && (
+                <div className={`text-[10px] mt-1 ${msg.sender === 'me' ? 'text-indigo-200' : 'text-gray-400'}`}>
+                  {formatMessageTime(msg.timestamp)}
+                </div>
+              )}
             </div>
+
+            {/* Withdraw popup menu */}
+            {withdrawMenuId === msg.id && canWithdraw(msg) && (
+              <div
+                className={`absolute ${msg.sender === 'me' ? 'right-0' : 'left-0'} bottom-full mb-2 z-50`}
+                onClick={(e) => e.stopPropagation()}
+              >
+                <button
+                  onClick={() => handleWithdraw(msg)}
+                  className="flex items-center gap-2 bg-white shadow-lg border border-gray-200 rounded-xl px-4 py-2.5 text-sm font-bold text-red-500 hover:bg-red-50 active:scale-95 transition-all whitespace-nowrap"
+                >
+                  <RotateCcw size={14} />
+                  {language === 'zh' ? '撤回' : 'Withdraw'}
+                </button>
+              </div>
+            )}
           </div>
         ))}
 
@@ -286,7 +382,7 @@ const ChatRoom = () => {
         )}
       </div>
 
-      {/* Input — 使用 max() 正确处理安全区域 */}
+      {/* Input */}
       <form
         onSubmit={handleSend}
         className="bg-white border-t px-4 pt-4 flex gap-2 shrink-0 z-10"

@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { useMarketplace } from '../context/MarketplaceContext.jsx'
-import { MapPin, Phone, MessageSquare, Heart, Lock, Edit3, Flag, ExternalLink, ChevronRight } from 'lucide-react'
+import { MapPin, Phone, MessageSquare, Heart, Lock, Edit3, Flag, ExternalLink, ChevronRight, Building2, Calendar, Send, Trash2 } from 'lucide-react'
 import { supabase } from '../lib/supabaseClient'
 import { SkeletonDetail } from '../components/Skeleton.jsx'
 import ReportModal from '../components/ReportModal.jsx'
@@ -32,6 +32,12 @@ const ProductDetail = () => {
   const [activeImageIdx, setActiveImageIdx] = useState(0)
   const [sellerProfile, setSellerProfile] = useState(null)
 
+  // Comments state (for rental posts)
+  const [comments, setComments] = useState([])
+  const [commentText, setCommentText] = useState('')
+  const [loadingComments, setLoadingComments] = useState(false)
+  const [submittingComment, setSubmittingComment] = useState(false)
+
   useEffect(() => {
     if (item?.owner_id) {
       supabase
@@ -44,6 +50,41 @@ const ProductDetail = () => {
         })
     }
   }, [item?.owner_id])
+
+  // Fetch comments for rental-type listings
+  useEffect(() => {
+    if (!item || item.listingType !== 'rental') return
+    setLoadingComments(true)
+    supabase
+      .from('comments')
+      .select('*, profiles:user_id(full_name, avatar_url)')
+      .eq('product_id', item.id)
+      .order('created_at', { ascending: true })
+      .then(({ data }) => {
+        setComments(data || [])
+        setLoadingComments(false)
+      })
+  }, [item?.id, item?.listingType])
+
+  const handleAddComment = async () => {
+    if (!commentText.trim() || !session?.user?.id) return
+    setSubmittingComment(true)
+    const { data, error } = await supabase
+      .from('comments')
+      .insert({ product_id: item.id, user_id: session.user.id, content: commentText.trim() })
+      .select('*, profiles:user_id(full_name, avatar_url)')
+      .single()
+    if (!error && data) {
+      setComments(prev => [...prev, data])
+      setCommentText('')
+    }
+    setSubmittingComment(false)
+  }
+
+  const handleDeleteComment = async (commentId) => {
+    await supabase.from('comments').delete().eq('id', commentId)
+    setComments(prev => prev.filter(c => c.id !== commentId))
+  }
 
   if (loadingItem) return <SkeletonDetail />
   if (!item) return <div className="mx-auto max-w-md px-4 pt-4">{t.noItemsFound}</div>
@@ -217,6 +258,118 @@ const ProductDetail = () => {
                       <ChevronRight size={18} />
                     </div>
                   </div>
+                </div>
+              )}
+
+              {/* Rental-specific: Room Type + Available From */}
+              {item.listingType === 'rental' && (item.roomType || item.availableFrom) && (
+                <div className="flex flex-wrap gap-3 pt-4 border-t border-slate-100">
+                  {item.roomType && (
+                    <div className="flex items-center gap-2 px-4 py-2 bg-amber-50 rounded-2xl border border-amber-100/50">
+                      <Building2 size={14} className="text-amber-600" />
+                      <span className="text-[12px] font-bold text-amber-700">
+                        {language === 'zh'
+                          ? { single: '单间', master: '主卧', middle: '中房', small: '小房', studio: '开间', whole: '整套' }[item.roomType] || item.roomType
+                          : { single: 'Single Room', master: 'Master Room', middle: 'Middle Room', small: 'Small Room', studio: 'Studio', whole: 'Whole Unit' }[item.roomType] || item.roomType}
+                      </span>
+                    </div>
+                  )}
+                  {item.availableFrom && (
+                    <div className="flex items-center gap-2 px-4 py-2 bg-blue-50 rounded-2xl border border-blue-100/50">
+                      <Calendar size={14} className="text-blue-600" />
+                      <span className="text-[12px] font-bold text-blue-700">
+                        {language === 'zh' ? '可入住: ' : 'Available: '}{new Date(item.availableFrom).toLocaleDateString()}
+                      </span>
+                    </div>
+                  )}
+                </div>
+              )}
+
+              {/* Rental Tips */}
+              {item.listingType === 'rental' && (
+                <div className="bg-amber-50/80 p-5 rounded-2xl border border-amber-200/50">
+                  <div className="flex items-center gap-2 mb-3">
+                    <span className="text-lg">⚠️</span>
+                    <span className="text-sm font-black text-amber-700">
+                      {language === 'zh' ? '温馨提示' : 'Friendly Reminders'}
+                    </span>
+                  </div>
+                  <ul className="space-y-2 text-[12px] font-medium text-amber-800/80 leading-relaxed">
+                    <li className="flex gap-2"><span className="shrink-0">1.</span><span>{language === 'zh' ? '异性合租需谨慎' : 'Be cautious with co-ed sharing arrangements'}</span></li>
+                    <li className="flex gap-2"><span className="shrink-0">2.</span><span>{language === 'zh' ? '没完成合同之前不要交任何费用' : 'Do NOT pay any fees before completing a contract'}</span></li>
+                    <li className="flex gap-2"><span className="shrink-0">3.</span><span>{language === 'zh' ? '点击头像可查看用户发布的内容或者举报 TA' : 'Tap on the user avatar to view their posts or report them'}</span></li>
+                    <li className="flex gap-2"><span className="shrink-0">4.</span><span>{language === 'zh' ? '转租房帖子下方有留言处，大家都可见' : 'Comments on rental posts are visible to everyone'}</span></li>
+                    <li className="flex gap-2"><span className="shrink-0">5.</span><span>{language === 'zh' ? '谨防被骗，都是学生，要互帮互助！共同营造更和谐安全的留学生活' : "Stay alert against scams — we are all students, let's help each other build a safer community!"}</span></li>
+                  </ul>
+                </div>
+              )}
+
+              {/* Public Comments (Rental only) */}
+              {item.listingType === 'rental' && (
+                <div className="pt-6 border-t border-slate-100">
+                  <h3 className="text-xs font-black text-slate-400 uppercase tracking-widest mb-4">
+                    {language === 'zh' ? '公开留言' : 'Public Comments'} ({comments.length})
+                  </h3>
+                  {/* Comment list */}
+                  <div className="space-y-3 mb-4">
+                    {loadingComments ? (
+                      <div className="text-center py-4 text-slate-400 text-sm">Loading...</div>
+                    ) : comments.length === 0 ? (
+                      <div className="text-center py-4 text-slate-400 text-sm">
+                        {language === 'zh' ? '暂无留言，来说两句吧' : 'No comments yet. Be the first!'}
+                      </div>
+                    ) : (
+                      comments.map(c => (
+                        <div key={c.id} className="flex gap-3 group">
+                          <div
+                            className="w-8 h-8 rounded-full overflow-hidden shrink-0 border border-white shadow-sm cursor-pointer"
+                            onClick={() => navigate(`/user/${c.user_id}`)}
+                          >
+                            <img src={c.profiles?.avatar_url || '/default-avatar.svg'} alt="" className="w-full h-full object-cover" />
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="flex items-baseline gap-2">
+                              <span className="text-[12px] font-bold text-slate-700">{c.profiles?.full_name || 'User'}</span>
+                              <span className="text-[10px] text-slate-400">{new Date(c.created_at).toLocaleString()}</span>
+                              {c.user_id === session?.user?.id && (
+                                <button
+                                  onClick={() => handleDeleteComment(c.id)}
+                                  className="ml-auto opacity-0 group-hover:opacity-100 text-slate-300 hover:text-red-500 transition-all p-0.5"
+                                >
+                                  <Trash2 size={12} />
+                                </button>
+                              )}
+                            </div>
+                            <p className="text-[13px] text-slate-600 font-medium mt-0.5 break-words">{c.content}</p>
+                          </div>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                  {/* Comment input */}
+                  {session?.user && (
+                    <div className="flex items-center gap-2">
+                      <input
+                        type="text"
+                        value={commentText}
+                        onChange={e => setCommentText(e.target.value)}
+                        onKeyDown={e => e.key === 'Enter' && handleAddComment()}
+                        placeholder={language === 'zh' ? '写留言...' : 'Write a comment...'}
+                        className="flex-1 bg-white/60 border border-slate-100 rounded-2xl px-4 py-3 text-[13px] focus:outline-none focus:ring-2 focus:ring-amber-500/20 focus:bg-white transition-all font-medium"
+                      />
+                      <button
+                        onClick={handleAddComment}
+                        disabled={submittingComment || !commentText.trim()}
+                        className="w-10 h-10 rounded-full bg-amber-500 text-white flex items-center justify-center hover:bg-amber-600 active:scale-95 transition-all disabled:opacity-40"
+                      >
+                        {submittingComment ? (
+                          <div className="w-4 h-4 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                        ) : (
+                          <Send size={16} />
+                        )}
+                      </button>
+                    </div>
+                  )}
                 </div>
               )}
 
