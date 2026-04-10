@@ -591,6 +591,7 @@ export const MarketplaceProvider = ({ children }) => {
         user_lat: userLat,
         user_lng: userLng,
         max_distance_km: maxDistanceKm === 'Any' ? null : (Number(maxDistanceKm) || null),
+        listing_type_filter: listingTypeFilter,
         page_limit: limit,
         page_offset: (page - 1) * limit
       })

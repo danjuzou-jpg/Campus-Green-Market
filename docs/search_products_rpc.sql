@@ -15,6 +15,7 @@ CREATE OR REPLACE FUNCTION search_products(
     user_lat FLOAT DEFAULT NULL,
     user_lng FLOAT DEFAULT NULL,
     max_distance_km FLOAT DEFAULT NULL,
+    listing_type_filter TEXT DEFAULT 'idle',
     page_limit INT DEFAULT 20,
     page_offset INT DEFAULT 0
 ) RETURNS TABLE (
@@ -31,6 +32,9 @@ CREATE OR REPLACE FUNCTION search_products(
     lng FLOAT,
     owner_id UUID,
     contact_info JSONB,
+    listing_type TEXT,
+    room_type TEXT,
+    available_from DATE,
     created_at TIMESTAMPTZ,
     updated_at TIMESTAMPTZ,
     distance_km FLOAT
@@ -51,6 +55,9 @@ BEGIN
         p.lng,
         p.owner_id,
         p.contact_info,
+        p.listing_type,
+        p.room_type,
+        p.available_from,
         p.created_at,
         p.updated_at,
         -- Calculate distance if user lat/lng provided, else 0
@@ -83,7 +90,14 @@ BEGIN
         -- 3. Location Name Filter (case insensitive)
         AND (location_filter = 'All Locations' OR p.location_name ILIKE '%' || location_filter || '%')
         
-        -- 4. Distance Filter
+        -- 4. Listing Type Filter (idle / rental)
+        AND (
+            (listing_type_filter = 'rental' AND p.listing_type = 'rental') OR
+            (listing_type_filter = 'idle' AND (p.listing_type = 'idle' OR p.listing_type IS NULL)) OR
+            (listing_type_filter = 'ALL')
+        )
+        
+        -- 5. Distance Filter
         AND (
             max_distance_km IS NULL -- 'Any'
             OR max_distance_km = 0 
