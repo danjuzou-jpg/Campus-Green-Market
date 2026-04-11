@@ -101,7 +101,7 @@ const Auth = () => {
                     finalOfferUrl = fileName
                 }
 
-                const { error } = await supabase.auth.signUp({
+                const { data, error } = await supabase.auth.signUp({
                     email,
                     password,
                     options: {
@@ -114,6 +114,9 @@ const Auth = () => {
                     }
                 })
                 if (error) throw error
+                if (data?.user && data.user.identities && data.user.identities.length === 0) {
+                    throw new Error(language === 'zh' ? '该邮箱已被注册或限流，请直接登录' : 'Email already registered or rate-limited. Please log in.')
+                }
                 setSuccessMessage(text.registerSuccess)
             } else if (mode === 'forgot') {
                 const { error } = await supabase.auth.resetPasswordForEmail(email, {
