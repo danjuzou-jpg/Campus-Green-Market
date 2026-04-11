@@ -505,6 +505,7 @@ export const MarketplaceProvider = ({ children }) => {
         const schoolFromMeta = userMeta.school || detectSchoolFromEmail(session?.user?.email)?.en || 'Unknown University'
         const nameFromMeta = userMeta.full_name || session?.user?.email?.split('@')[0] || 'User'
 
+        const insertStatus = userMeta.is_freshman ? 'pending_offer' : 'unverified'
         const { data: newProfile, error: insertError } = await supabase
           .from('profiles')
           .insert({
@@ -512,7 +513,7 @@ export const MarketplaceProvider = ({ children }) => {
             email: session?.user?.email,
             full_name: nameFromMeta,
             school: schoolFromMeta,
-            verification_status: 'unverified'
+            verification_status: insertStatus
           })
           .select()
           .single()
@@ -520,12 +521,15 @@ export const MarketplaceProvider = ({ children }) => {
         if (insertError) {
           console.error('Error creating profile:', insertError)
         } else if (newProfile) {
+          const computedStatus = getUserDisplayStatus(newProfile)
           setUser({
             id: newProfile.id,
             name: newProfile.full_name,
             school: newProfile.school,
-            verified: false,
-            verificationStatus: 'unverified',
+            verified: computedStatus === 'verified',
+            verificationStatus: newProfile.verification_status || 'unverified',
+            displayStatus: computedStatus,
+            createdAt: newProfile.created_at,
             avatar: newProfile.avatar_url || '/default-avatar.svg',
             email: newProfile.email
           })
@@ -946,17 +950,16 @@ export const MarketplaceProvider = ({ children }) => {
     return true
   }, [session])
 
-  // 发送 edu.my 邮箱验证码（使用 Supabase OTP）
+  // 发送 edu.my 邮箱验证码（用于永久替换用户邮箱）
   const sendVerificationEmail = async (email) => {
     if (!email.toLowerCase().endsWith('.edu.my')) {
       throw new Error('Invalid email domain')
     }
-    const { error } = await supabase.auth.signInWithOtp({
-      email,
-      options: { shouldCreateUser: false }
+    const { error } = await supabase.auth.updateUser({
+      email: email
     })
     if (error) throw error
-    // 同时记录认证邮箱到 profile
+    // 同时记录认证邮箱到 profile 的冗余字段，方便快速查询
     if (session?.user) {
       await supabase.from('profiles')
         .update({ verification_email: email })

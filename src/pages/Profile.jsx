@@ -100,8 +100,8 @@ const Profile = () => {
     }
     setVerifyLoading(true)
     try {
-      // Verify OTP with Supabase
-      const { error } = await supabase.auth.verifyOtp({ email: emailInput, token: codeInput, type: 'email' })
+      // Verify OTP with Supabase indicating an email change
+      const { error } = await supabase.auth.verifyOtp({ email: emailInput, token: codeInput, type: 'email_change' })
       if (error) throw error
 
       await updateVerificationStatus('verified')
