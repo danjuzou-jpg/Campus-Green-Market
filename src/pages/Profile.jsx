@@ -245,7 +245,9 @@ const Profile = () => {
                 <>
                   <div className="flex items-center gap-2">
                     <div className="text-xl font-black text-white truncate drop-shadow-sm">{user.name}</div>
-                    {user.verificationStatus === 'verified' && <CheckCircle size={20} fill="#fdfbf7" className="text-[#00b478] shrink-0" />}
+                    {user.displayStatus === 'verified' && <CheckCircle size={20} fill="#fdfbf7" className="text-[#00b478] shrink-0" />}
+                    {user.displayStatus === 'freshman' && <span className="text-lg shrink-0" title="Freshman / 新生">🌱</span>}
+                    {user.displayStatus === 'stranger' && <span className="text-lg shrink-0" title="Stranger / 陌生人">⚠️</span>}
                   </div>
                   <div className="text-[13px] text-teal-50 font-bold truncate mt-1 opacity-90 drop-shadow-sm">
                     {user.school || 'Universiti Malaya'}
@@ -253,25 +255,37 @@ const Profile = () => {
 
                   {/* Status Badges or Verify Button */}
                   <div className="mt-4">
-                    {user.verificationStatus === 'unverified' && (
+                    {user.displayStatus === 'verified' && (
+                      <div className="inline-flex items-center gap-1.5 px-4 py-2 bg-white/20 min-w-max text-white border border-white/30 rounded-full text-[11px] font-black uppercase tracking-wider backdrop-blur-md">
+                        <span>✅</span>
+                        {t.verifiedBadge}
+                      </div>
+                    )}
+                    {user.displayStatus === 'freshman' && (
+                      <div className="inline-flex items-center gap-1.5 px-4 py-2 bg-[#dcfce7] text-[#166534] border border-[#bbf7d0] rounded-full text-[11px] font-black uppercase tracking-wider backdrop-blur-md shadow-sm">
+                        <span>🌱</span>
+                        {language === 'zh' ? '新生 / Freshman' : 'Freshman'}
+                      </div>
+                    )}
+                    {(user.displayStatus === 'pending_offer' || user.displayStatus === 'pending') && (
+                      <div className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-400 text-amber-900 rounded-full text-[11px] font-black shadow-lg shadow-black/5 uppercase tracking-wider">
+                        <span className="animate-pulse">⏳</span>
+                        {language === 'zh' ? 'Offer审核中' : 'Pending Review'}
+                      </div>
+                    )}
+                    {user.displayStatus === 'stranger' && (
+                      <div className="inline-flex items-center gap-1.5 px-4 py-2 bg-rose-500 text-white rounded-full text-[11px] font-black shadow-lg shadow-black/5 uppercase tracking-wider border border-rose-400">
+                        <span>⚠️</span>
+                        {language === 'zh' ? '陌生人 / Stranger' : 'Stranger'}
+                      </div>
+                    )}
+                    {user.displayStatus === 'unverified' && (
                       <button
                         onClick={() => setIsModalOpen(true)}
                         className="bg-white text-teal-600 text-[11px] font-black px-5 py-2 rounded-full shadow-lg shadow-black/10 active:scale-95 transition-all uppercase tracking-wider"
                       >
                         {t.verifyNow}
                       </button>
-                    )}
-                    {user.verificationStatus === 'pending' && (
-                      <div className="inline-flex items-center gap-1.5 px-4 py-2 bg-amber-400 text-amber-900 rounded-full text-[11px] font-black shadow-lg shadow-black/5 uppercase tracking-wider">
-                        <span className="animate-pulse">⏳</span>
-                        {t.pendingBadge}
-                      </div>
-                    )}
-                    {user.verificationStatus === 'verified' && (
-                      <div className="inline-flex items-center gap-1.5 px-4 py-2 bg-white/20 min-w-max text-white border border-white/30 rounded-full text-[11px] font-black uppercase tracking-wider backdrop-blur-md">
-                        <span>✅</span>
-                        {t.verifiedBadge}
-                      </div>
                     )}
                   </div>
                 </>

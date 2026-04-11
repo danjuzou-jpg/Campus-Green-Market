@@ -7,7 +7,7 @@ import { LoadingButton } from '../components/LoadingSpinner.jsx'
 import { Package, Building2 } from 'lucide-react'
 
 const Upload = () => {
-  const { addListing, categories, language, translations, locations, normalize, showToast } = useMarketplace()
+  const { addListing, categories, language, translations, locations, normalize, showToast, user } = useMarketplace()
   const t = translations[language]
   const navigate = useNavigate()
 
@@ -92,6 +92,14 @@ const Upload = () => {
     const tags = tagsInput.split(' ').map(s => s.trim()).filter(Boolean)
 
     try {
+      // 权限门禁：只有 verified 和 freshman 可以发布
+      if (user?.displayStatus !== 'verified' && user?.displayStatus !== 'freshman') {
+        const msg = user?.displayStatus === 'pending_offer'
+          ? (language === 'zh' ? 'Offer审核中，请等待后台通过后再发布' : 'Your Offer is under review. Please wait for approval before posting.')
+          : (language === 'zh' ? '请先完成认证后再发布商品' : 'Please verify your identity before posting.')
+        showToast('warning', msg)
+        return
+      }
       setSubmitting(true)
       const id = await addListing({
         title, price, images, description, whatsapp, wechat, instagram,

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useCallback, useEffect, useMemo, useR
 import { supabase } from '../lib/supabaseClient'
 import { POPULAR_LOCATIONS } from '../lib/locations.js'
 import { detectSchoolFromEmail } from '../lib/schools.js'
+import { getUserDisplayStatus } from '../lib/userStatus.js'
 
 const MarketplaceContext = createContext(null)
 
@@ -485,12 +486,15 @@ export const MarketplaceProvider = ({ children }) => {
           // Background update: fill in school for existing users
           supabase.from('profiles').update({ school: schoolName }).eq('id', userId).then()
         }
+        const computedStatus = getUserDisplayStatus(data)
         setUser({
           id: data.id,
           name: data.full_name || data.email?.split('@')[0] || 'User',
           school: schoolName,
-          verified: data.verification_status === 'verified',
+          verified: computedStatus === 'verified',
           verificationStatus: data.verification_status || 'unverified',
+          displayStatus: computedStatus,
+          createdAt: data.created_at,
           avatar: data.avatar_url || '/default-avatar.svg',
           email: data.email
         })
