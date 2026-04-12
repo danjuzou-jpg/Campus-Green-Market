@@ -76,7 +76,7 @@ export const MALAYSIAN_UNIVERSITIES = [
     key: 'MONASH',
     en: 'Monash University Malaysia',
     zh: '莫纳什大学马来西亚分校',
-    emailSuffixes: ['student.monash.edu', 'monash.edu.my'],
+    emailSuffixes: ['student.monash.edu', 'monash.edu.my', 'monash.edu'],
     lat: 3.0644, lng: 101.6012
   },
   {
