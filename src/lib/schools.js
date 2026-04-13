@@ -106,6 +106,13 @@ export const MALAYSIAN_UNIVERSITIES = [
     zh: '精英大学',
     emailSuffixes: ['helplive.edu.my', 'help.edu.my'],
     lat: 3.1098, lng: 101.6587
+  },
+  {
+    key: 'UOW',
+    en: 'UOW Malaysia KDU',
+    zh: '伍伦贡大学马来西亚分校',
+    emailSuffixes: ['student.uow.edu.my', 'uow.edu.my'],
+    lat: 3.0926, lng: 101.5582
   }
 ]
 
