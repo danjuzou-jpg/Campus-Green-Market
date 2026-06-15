@@ -14,12 +14,12 @@ const Layout = () => {
   return (
     <div className="min-h-screen bg-gradient-to-br from-[#dcfcf2] via-[#f0fdf4] to-[#e0f7fa]">
       {/* 极简透明/毛玻璃状态栏 */}
-      <header className="fixed top-0 left-0 right-0 z-50 pt-12 pb-2 px-6 bg-gradient-to-b from-[#dcfcf2]/90 to-transparent backdrop-blur-[2px]">
+      <header className="fixed top-0 left-0 right-0 z-50 pt-6 pb-2 px-6 bg-gradient-to-b from-[#dcfcf2]/90 to-transparent backdrop-blur-[2px]">
         <div className="mx-auto max-w-7xl flex items-center justify-between">
 
           <div className="flex items-center justify-between w-full">
             {/* Left: Logo */}
-            <div className="shrink-0 flex items-center gap-2">
+            <div className="shrink-0 flex items-center gap-2 -mt-2">
               <Logo />
             </div>
 
@@ -50,7 +50,7 @@ const Layout = () => {
         </div>
       </header>
 
-      <div className="pt-28 pb-32 max-w-7xl mx-auto">
+      <div className="pt-36 pb-32 max-w-7xl mx-auto">
         <Outlet />
       </div>
       <BottomNav />
