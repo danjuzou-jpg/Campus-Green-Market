@@ -16,7 +16,7 @@ const Welcome = () => {
   return (
     <div className="min-h-screen bg-white flex flex-col justify-between px-6">
       <div className="flex-1 flex flex-col items-center justify-center py-10">
-        <div className="w-24 h-24 mb-6">
+        <div className="w-72 h-auto mb-6">
           <Logo className="w-full h-full" />
         </div>
         <h1 className="text-3xl font-bold text-gray-900 text-center mb-2">
