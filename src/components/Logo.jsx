@@ -5,7 +5,7 @@ const Logo = ({ className = '' }) => {
   return (
     <img 
       src={logoImg} 
-      className={`object-contain block ${className || 'h-40 w-auto'}`} 
+      className={`object-contain block ${className || 'h-28 w-auto'}`} 
       alt="Logo" 
     />
   )

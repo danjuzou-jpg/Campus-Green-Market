@@ -154,7 +154,7 @@ const Auth = () => {
             <div className="flex-1 flex flex-col items-center justify-center px-6 py-12 relative z-10">
                 {/* Logo */}
                 <div className="mb-8 flex flex-col items-center">
-                    <div className="w-full max-w-2xl px-2 h-auto mb-4">
+                    <div className="w-full max-w-lg px-2 h-auto mb-4">
                         <Logo className="w-full h-full" />
                     </div>
                     <h1 className="text-2xl font-black text-gray-900">
