@@ -155,7 +155,7 @@ const Auth = () => {
                 {/* Logo */}
                 <div className="mb-8 flex flex-col items-center">
                     <div className="w-16 h-16 mb-4">
-                        <Logo />
+                        <Logo className="w-full h-full" />
                     </div>
                     <h1 className="text-2xl font-black text-gray-900">
                         {mode === 'login' ? text.loginTitle : mode === 'register' ? text.registerTitle : mode === 'forgot' ? text.resetPasswordTitle : text.newPasswordTitle}
