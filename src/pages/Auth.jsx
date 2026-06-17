@@ -132,7 +132,28 @@ const Auth = () => {
             }
         } catch (err) {
             console.error('Auth error:', err)
-            setError(err.message || 'Something went wrong')
+            let errMsg = err.message || 'Something went wrong'
+            
+            // Translate common Supabase error messages for better UX
+            if (language === 'zh') {
+                if (errMsg.includes('Email not confirmed')) {
+                    errMsg = '【登录失败】您的邮箱尚未验证！请前往您的邮箱（检查收件箱和垃圾邮件）点击验证链接，验证后再登录。'
+                } else if (errMsg.includes('Invalid login credentials')) {
+                    errMsg = '账号或密码错误，请重试。'
+                } else if (errMsg.includes('User already registered')) {
+                    errMsg = '该邮箱已注册，请直接登录。'
+                } else if (errMsg.includes('rate limit')) {
+                    errMsg = '请求过于频繁，请稍后再试。'
+                } else if (errMsg.includes('Password should be at least')) {
+                    errMsg = '密码长度至少需要 6 个字符。'
+                }
+            } else {
+                if (errMsg.includes('Email not confirmed')) {
+                    errMsg = 'Email not confirmed! Please check your inbox (and spam folder) for the verification link before logging in.'
+                }
+            }
+            
+            setError(errMsg)
         } finally {
             setLoading(false)
         }
